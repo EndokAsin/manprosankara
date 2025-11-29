@@ -109,7 +109,7 @@
                     <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Tanggal</label><input type="date" name="event_date" required class="w-full border rounded-lg px-3 py-2"></div>
                     <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Lokasi</label><input type="text" name="location" class="w-full border rounded-lg px-3 py-2"></div>
                 </div>
-                <input type="hidden" name="status" value="Tahap 1: Submit Proposal">
+                <input type="hidden" name="status" value="Tahap 1: Pra-Persiapan">
                 <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition">Simpan Proyek</button>
             </form>
         </div>
@@ -121,19 +121,21 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // --- 7 STEPS SOP SESUAI PROMPT ---
         const SOP_STEPS = [
-            { id: 1, name: "Proposal", desc: "H-18", fullStatus: "Tahap 1: Submit Proposal" },
-            { id: 2, name: "Media & Fin", desc: "H-15", fullStatus: "Tahap 2: Media & Finance" },
-            { id: 3, name: "Rekrutmen", desc: "H-15 s/d H-5", fullStatus: "Tahap 3: Rekrutmen & Pembelian" },
-            { id: 4, name: "First Meet", desc: "H-3", fullStatus: "Tahap 4: First Meet" },
-            { id: 5, name: "Kegiatan", desc: "H-0", fullStatus: "Tahap 5: Kegiatan" },
-            { id: 6, name: "Laporan", desc: "H+2", fullStatus: "Tahap 6: Laporan" }
+            { id: 1, name: "Pra-Persiapan", desc: "Survey & Konsep", fullStatus: "Tahap 1: Pra-Persiapan" },
+            { id: 2, name: "Persetujuan", desc: "RAB & Rundown", fullStatus: "Tahap 2: Persetujuan Konsep" },
+            { id: 3, name: "Media & Admin", desc: "Publikasi & Dana", fullStatus: "Tahap 3: Media & Administrasi" },
+            { id: 4, name: "Rekrutmen", desc: "Oprec Delegasi", fullStatus: "Tahap 4: Rekrutmen Delegasi" },
+            { id: 5, name: "First Meet", desc: "Koordinasi Final", fullStatus: "Tahap 5: First Meet" },
+            { id: 6, name: "Pelaksanaan", desc: "Kegiatan (D-Day)", fullStatus: "Tahap 6: Pelaksanaan Kegiatan" },
+            { id: 7, name: "Pelaporan", desc: "LPJ & Arsip", fullStatus: "Tahap 7: Pelaporan Akhir" }
         ];
 
         const app = {
             currentPage: 'projects',
             activeProjectId: null,
-            activeStepTab: 1, // Default tab
+            activeStepTab: 1, 
             projects: [],
             
             init: async () => {
@@ -158,12 +160,10 @@
                 if (app.currentPage === 'projects') app.renderProjectList(document.getElementById('content-area'));
             },
 
-            // --- MAIN LOGIC: SWITCH STEP VIEW ---
             getProjectDetails: async (id, stepOverride = null) => {
                 app.activeProjectId = id;
                 app.currentPage = 'detail';
                 
-                // Fetch All Data needed
                 const [proj, rundowns, budgets, volunteers, files] = await Promise.all([
                     supabase.from('projects').select('*').eq('id', id).single(),
                     supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', {ascending: true}),
@@ -172,15 +172,17 @@
                     supabase.from('project_files').select('*').eq('project_id', id)
                 ]);
 
-                if (!proj.data) { app.showToast("Project not found"); return; }
+                if (!proj.data) { 
+                    app.showToast("Data proyek tidak ditemukan (mungkin sudah dihapus)."); 
+                    app.showPage('projects');
+                    return; 
+                }
                 
-                // Determine step to show
                 let currentStatusStep = 1;
                 if (proj.data.status && proj.data.status.includes('Tahap')) {
                     currentStatusStep = parseInt(proj.data.status.split(':')[0].replace('Tahap ', ''));
                 }
                 
-                // If override is provided (clicked from stepper), use it. Else use current status.
                 app.activeStepTab = stepOverride || currentStatusStep;
 
                 app.renderProjectDetailView(proj.data, rundowns.data||[], budgets.data||[], volunteers.data||[], files.data||[], currentStatusStep);
@@ -188,217 +190,166 @@
 
             renderProjectDetailView: (project, rundowns, budgets, volunteers, files, currentStatusStep) => {
                 const container = document.getElementById('content-area');
-                
-                // Render Step Content based on activeStepTab
                 let stepContent = '';
-                const isCurrent = app.activeStepTab === currentStatusStep;
-                const isPassed = app.activeStepTab < currentStatusStep;
                 
-                // --- STEP 1: PROPOSAL ---
                 if(app.activeStepTab === 1) {
                     stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-4 text-purple-700">Tahap 1: Submit Proposal</h3>
-                            <div class="mb-4 text-sm text-slate-600">Lengkapi data target panti/sekolah dan simpan proposal awal.</div>
-                            <div class="mb-6">
-                                <label class="block text-sm font-bold text-slate-700 mb-1">Target Panti/Yayasan</label>
-                                <input type="text" id="inp-target" value="${project.target_audience || ''}" class="w-full border rounded-lg px-4 py-3 bg-slate-50" placeholder="Contoh: Panti Asuhan Al-Hikmah">
-                                <button onclick="app.updateField('${project.id}', 'target_audience', document.getElementById('inp-target').value)" class="mt-2 text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded font-bold">Simpan Target</button>
+                            <h3 class="font-bold text-lg mb-2 text-purple-700">Tahap 1: Pra-Persiapan (Proposal Awal)</h3>
+                            <div class="space-y-4">
+                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Target Panti/Fasilitas</label><input type="text" id="inp-target" value="${project.target_audience || ''}" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Nama, Alamat..."></div>
+                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Konsep Acara</label><textarea id="inp-concept" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Jelaskan konsep...">${project.concept_note || ''}</textarea></div>
+                                ${currentStatusStep === 1 ? `<button onclick="app.saveAndNext('${project.id}', 2, {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : `<button onclick="app.updateMultiField('${project.id}', {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="text-xs bg-purple-100 text-purple-700 px-4 py-2 rounded-lg font-bold">Update Data</button>`}
                             </div>
-                            <!-- Action Button -->
-                            ${currentStatusStep === 1 ? `<button onclick="app.updateProjectStatus('${project.id}', 2)" class="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">Selesai & Lanjut ke Media/Finance <i class="fas fa-arrow-right ml-2"></i></button>` : `<div class="bg-green-100 text-green-700 p-3 rounded-lg text-center font-bold"><i class="fas fa-check-circle mr-2"></i> Tahap Selesai</div>`}
-                        </div>
-                    `;
-                }
-                
-                // --- STEP 2: MEDIA & FINANCE (RAB INTERNAL) ---
-                else if(app.activeStepTab === 2) {
+                        </div>`;
+                } else if(app.activeStepTab === 2) {
                     const totalBudget = budgets.reduce((sum, b) => sum + (b.total_price || 0), 0);
                     stepContent = `
                          <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-4 text-blue-700">Tahap 2: Media & Finance</h3>
-                            
-                            <!-- Media Partners -->
-                            <div class="mb-6 border-b border-slate-100 pb-6">
-                                <label class="block text-sm font-bold text-slate-700 mb-1">Media Partners</label>
-                                <textarea id="inp-media" rows="2" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="List media partner...">${project.media_partners || ''}</textarea>
-                                <button onclick="app.updateField('${project.id}', 'media_partners', document.getElementById('inp-media').value)" class="mt-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded font-bold">Simpan Media</button>
-                            </div>
-
-                            <!-- Internal Budget Table -->
+                            <h3 class="font-bold text-lg mb-2 text-blue-700">Tahap 2: Persetujuan Konsep</h3>
                             <div class="mb-8">
-                                <div class="flex justify-between items-center mb-3">
-                                    <h4 class="font-bold text-slate-800">RAB / Budget</h4>
-                                    <button onclick="app.openBudgetModal()" class="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100">+ Tambah Item</button>
-                                </div>
-                                <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-                                    <table class="w-full text-sm text-left">
-                                        <thead class="bg-slate-100 text-slate-500 font-bold"><tr><th class="p-3">Item</th><th class="p-3 text-right">Harga</th></tr></thead>
-                                        <tbody class="divide-y divide-slate-200">
-                                            ${budgets.map(b => `<tr><td class="p-3"><div>${b.item_name}</div><div class="text-xs text-slate-400">${b.quantity} unit @${b.unit_price/1000}k</div></td><td class="p-3 text-right font-bold">${app.formatCurrency(b.total_price)}</td></tr>`).join('')}
-                                            ${budgets.length===0 ? '<tr><td colspan="2" class="p-4 text-center text-slate-400 italic">Belum ada data anggaran.</td></tr>' : ''}
-                                        </tbody>
-                                        <tfoot class="border-t"><tr><td class="p-3 font-bold">Total</td><td class="p-3 text-right font-bold text-blue-700">${app.formatCurrency(totalBudget)}</td></tr></tfoot>
-                                    </table>
-                                </div>
+                                <div class="flex justify-between items-center mb-3"><h4 class="font-bold text-slate-800">RAB</h4><button onclick="app.openBudgetModal()" class="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100">+ Tambah</button></div>
+                                <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-100 font-bold"><tr><th class="p-3">Item</th><th class="p-3 text-right">Total</th></tr></thead><tbody class="divide-y divide-slate-200">${budgets.map(b => `<tr><td class="p-3"><div>${b.item_name}</div><div class="text-xs text-slate-400">${b.quantity} x ${(b.unit_price/1000)}k</div></td><td class="p-3 text-right font-bold">${app.formatCurrency(b.total_price)}</td></tr>`).join('')}</tbody><tfoot class="border-t"><tr><td class="p-3 font-bold">Total RAB</td><td class="p-3 text-right font-bold text-blue-700">${app.formatCurrency(totalBudget)}</td></tr></tfoot></table></div>
                             </div>
-
-                             ${currentStatusStep === 2 ? `<button onclick="app.updateProjectStatus('${project.id}', 3)" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">RAB Valid & Lanjut Rekrutmen <i class="fas fa-arrow-right ml-2"></i></button>` : `<div class="bg-green-100 text-green-700 p-3 rounded-lg text-center font-bold"><i class="fas fa-check-circle mr-2"></i> Tahap Selesai</div>`}
-                        </div>
-                    `;
-                }
-
-                // --- STEP 3: REKRUTMEN (VOLUNTEER INTERNAL) ---
-                else if(app.activeStepTab === 3) {
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center mb-3"><h4 class="font-bold text-slate-800">Rundown</h4><button onclick="app.openRundownModal()" class="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100">+ Tambah</button></div>
+                                <div class="space-y-2 border-l-2 border-slate-200 ml-2 pl-4">${rundowns.map(r => `<div class="text-sm"><span class="font-bold bg-slate-100 px-1 rounded">${r.time_start}-${r.time_end}</span> ${r.activity}</div>`).join('')}</div>
+                            </div>
+                             ${currentStatusStep === 2 ? `<button onclick="app.saveAndNext('${project.id}', 3, null)" class="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">Setujui & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : ''}
+                        </div>`;
+                } else if(app.activeStepTab === 3) {
                      stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-4 text-teal-700">Tahap 3: Rekrutmen & Pembelian</h3>
-                            
-                            <div class="mb-8">
-                                <div class="flex justify-between items-center mb-3">
-                                    <h4 class="font-bold text-slate-800">Divisi & Kebutuhan SDM</h4>
-                                    <button onclick="app.openVolunteerModal()" class="text-xs bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg font-bold hover:bg-teal-100">+ Tambah Divisi</button>
+                            <h3 class="font-bold text-lg mb-2 text-pink-700">Tahap 3: Media & Administrasi</h3>
+                            <div class="space-y-6">
+                                <div class="p-4 bg-pink-50 border border-pink-100 rounded-xl">
+                                    <h4 class="font-bold text-pink-800 mb-2">1. Publikasi Media</h4>
+                                    <div class="mb-2"><label class="block text-xs font-bold text-slate-600 mb-1">Link Poster</label><input type="text" id="inp-poster" value="${project.poster_link || ''}" class="w-full border rounded px-3 py-2 bg-white"></div>
+                                    <button onclick="app.updateField('${project.id}', 'poster_link', document.getElementById('inp-poster').value)" class="text-xs bg-pink-200 text-pink-800 px-3 py-1 rounded font-bold">Simpan Link</button>
                                 </div>
-                                <div class="grid grid-cols-1 gap-3">
-                                     ${volunteers.map(v => `<div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center"><div class="font-bold text-slate-700">${v.role_name}</div><div class="text-xs bg-white border px-2 py-1 rounded-full font-bold">${v.count} Orang</div></div>`).join('')}
-                                     ${volunteers.length===0 ? '<div class="text-center text-slate-400 italic p-4">Belum ada data divisi.</div>' : ''}
-                                </div>
+                                <div class="p-4 bg-yellow-50 border border-yellow-100 rounded-xl"><h4 class="font-bold text-yellow-800 mb-2">2. Keuangan</h4><div class="flex items-center gap-2"><span class="text-sm font-bold">Status:</span><span class="px-2 py-1 rounded bg-white border text-xs font-bold">${project.finance_status || 'Pending'}</span></div><button onclick="app.updateField('${project.id}', 'finance_status', 'Cair')" class="mt-2 text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold border border-green-200">Set Dana Cair</button></div>
                             </div>
-                            
-                            ${currentStatusStep === 3 ? `<button onclick="app.updateProjectStatus('${project.id}', 4)" class="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">Tim Terbentuk & Lanjut First Meet <i class="fas fa-arrow-right ml-2"></i></button>` : `<div class="bg-green-100 text-green-700 p-3 rounded-lg text-center font-bold"><i class="fas fa-check-circle mr-2"></i> Tahap Selesai</div>`}
-                        </div>
-                    `;
+                            ${currentStatusStep === 3 ? `<button onclick="app.saveAndNext('${project.id}', 4, {poster_link: document.getElementById('inp-poster').value})" class="w-full mt-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold shadow-lg shadow-pink-200 transition">Publikasi Tayang & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : ''}
+                        </div>`;
+                } else if(app.activeStepTab === 4) {
+                    stepContent = `<div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in"><h3 class="font-bold text-lg mb-2 text-teal-700">Tahap 4: Rekrutmen Delegasi</h3><div class="mb-8"><div class="flex justify-between items-center mb-3"><h4 class="font-bold text-slate-800">Manajemen Relawan</h4><button onclick="app.openVolunteerModal()" class="text-xs bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg font-bold hover:bg-teal-100">+ Tambah Divisi</button></div><div class="grid grid-cols-1 gap-3">${volunteers.map(v => `<div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center"><div class="font-bold text-slate-700">${v.role_name}</div><div class="text-xs bg-white border px-2 py-1 rounded-full font-bold">${v.count} Orang</div></div>`).join('')}</div></div>${currentStatusStep === 4 ? `<button onclick="app.saveAndNext('${project.id}', 5, null)" class="w-full mt-4 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">Delegasi Terbentuk & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : ''}</div>`;
+                } else if(app.activeStepTab === 5) {
+                    stepContent = `<div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in"><h3 class="font-bold text-lg mb-2 text-orange-600">Tahap 5: First Meet</h3><div class="p-4 bg-orange-50 rounded-xl border border-orange-100 mb-6"><h4 class="font-bold text-orange-800 mb-3">Agenda Checklist:</h4><ul class="list-disc list-inside text-sm text-orange-800 space-y-2"><li>Perkenalan Regional & Delegasi.</li><li>Penjelasan Konsep & Rundown.</li><li>Info Teknis.</li></ul></div>${currentStatusStep === 5 ? `<button onclick="app.saveAndNext('${project.id}', 6, null)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">First Meet Selesai <i class="fas fa-arrow-right ml-2"></i></button>` : ''}</div>`;
+                } else if(app.activeStepTab === 6) {
+                    stepContent = `<div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in"><h3 class="font-bold text-lg mb-4 text-green-700">Tahap 6: Pelaksanaan Kegiatan</h3><div class="text-center py-10 bg-green-50 rounded-xl border border-green-100"><div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl text-green-600"><i class="fas fa-calendar-check"></i></div><h4 class="text-xl font-bold text-green-800">Event Day!</h4><p class="text-green-600 max-w-md mx-auto mt-2">Pastikan dokumentasi berjalan.</p></div>${currentStatusStep === 6 ? `<button onclick="app.saveAndNext('${project.id}', 7, null)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">Acara Selesai, Lanjut Laporan <i class="fas fa-check ml-2"></i></button>` : ''}</div>`;
+                } else if(app.activeStepTab === 7) {
+                    stepContent = `<div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in"><h3 class="font-bold text-lg mb-2 text-slate-700">Tahap 7: Pelaporan</h3><div class="mb-6"><label class="block text-sm font-bold text-slate-700 mb-1">Isi Laporan / Link Drive</label><textarea id="inp-report" rows="5" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Tulis ringkasan...">${project.report_content || ''}</textarea>${currentStatusStep === 7 ? `<button onclick="app.updateMultiField('${project.id}', {report_content: document.getElementById('inp-report').value})" class="mt-2 text-xs bg-slate-200 text-slate-700 px-3 py-1 rounded font-bold">Simpan Laporan</button>` : ''}</div>${currentStatusStep === 7 ? `<div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold"><i class="fas fa-trophy text-xl mb-2 block"></i> Proyek Selesai!</div>` : ''}</div>`;
                 }
-
-                // --- STEP 4: FIRST MEET ---
-                else if(app.activeStepTab === 4) {
-                    stepContent = `
-                        <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-4 text-yellow-600">Tahap 4: First Meet</h3>
-                            <div class="p-4 bg-yellow-50 rounded-xl border border-yellow-100 mb-6">
-                                <h4 class="font-bold text-yellow-800 mb-2">Checklist First Meet:</h4>
-                                <ul class="list-disc list-inside text-sm text-yellow-700 space-y-1">
-                                    <li>Perkenalan seluruh panitia.</li>
-                                    <li>Pemaparan konsep acara & rundown kasar.</li>
-                                    <li>Penjelasan jobdesk per divisi.</li>
-                                    <li>Kesepakatan jadwal technical meeting.</li>
-                                </ul>
-                            </div>
-                            ${currentStatusStep === 4 ? `<button onclick="app.updateProjectStatus('${project.id}', 5)" class="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold shadow-lg shadow-yellow-200 transition">First Meet Selesai <i class="fas fa-arrow-right ml-2"></i></button>` : `<div class="bg-green-100 text-green-700 p-3 rounded-lg text-center font-bold"><i class="fas fa-check-circle mr-2"></i> Tahap Selesai</div>`}
-                        </div>
-                    `;
-                }
-
-                // --- STEP 5: KEGIATAN (RUNDOWN INTERNAL) ---
-                else if(app.activeStepTab === 5) {
-                    stepContent = `
-                        <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-4 text-green-700">Tahap 5: Kegiatan (H-0)</h3>
-                            
-                            <div class="mb-8">
-                                <div class="flex justify-between items-center mb-3">
-                                    <h4 class="font-bold text-slate-800">Rundown Acara</h4>
-                                    <button onclick="app.openRundownModal()" class="text-xs bg-green-50 text-green-600 px-3 py-1.5 rounded-lg font-bold hover:bg-green-100">+ Item Rundown</button>
-                                </div>
-                                <div class="space-y-0 border-l-2 border-slate-200 ml-2 pl-4">
-                                     ${rundowns.map(r => `
-                                        <div class="relative pb-6 last:pb-0">
-                                            <div class="absolute -left-[23px] top-1 w-3.5 h-3.5 bg-white border-2 border-green-500 rounded-full"></div>
-                                            <span class="text-xs font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-600">${r.time_start} - ${r.time_end}</span>
-                                            <div class="font-bold mt-1 text-slate-800">${r.activity}</div>
-                                            <div class="text-xs text-slate-500">${r.description || ''}</div>
-                                        </div>
-                                     `).join('')}
-                                     ${rundowns.length===0 ? '<div class="text-slate-400 italic text-sm">Belum ada rundown.</div>' : ''}
-                                </div>
-                            </div>
-                            
-                            ${currentStatusStep === 5 ? `<button onclick="app.updateProjectStatus('${project.id}', 6)" class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">Acara Selesai, Lanjut Laporan <i class="fas fa-check ml-2"></i></button>` : `<div class="bg-green-100 text-green-700 p-3 rounded-lg text-center font-bold"><i class="fas fa-check-circle mr-2"></i> Tahap Selesai</div>`}
-                        </div>
-                    `;
-                }
-
-                // --- STEP 6: LAPORAN ---
-                else if(app.activeStepTab === 6) {
-                    stepContent = `
-                        <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-4 text-slate-700">Tahap 6: Laporan & Evaluasi</h3>
-                            <div class="mb-4">
-                                <label class="block text-sm font-bold text-slate-700 mb-1">Catatan Evaluasi / Link LPJ</label>
-                                <textarea id="inp-report" rows="4" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Tulis evaluasi singkat atau link folder drive LPJ...">${project.report_content || ''}</textarea>
-                                <button onclick="app.updateField('${project.id}', 'report_content', document.getElementById('inp-report').value)" class="mt-2 text-xs bg-slate-200 text-slate-700 px-3 py-1 rounded font-bold">Simpan Catatan</button>
-                            </div>
-                             ${currentStatusStep === 6 ? `<div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold"><i class="fas fa-trophy text-xl mb-2 block"></i> Proyek Selesai Sepenuhnya!</div>` : ''}
-                        </div>
-                    `;
-                }
-
 
                 let html = `
-                    <div class="flex items-center gap-2 text-sm text-slate-500 mb-4">
-                        <button onclick="app.showPage('projects')" class="hover:text-green-600 transition"><i class="fas fa-arrow-left mr-1"></i> Kembali</button>
-                    </div>
-
-                    <div class="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-6">
-                        <div>
-                            <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">${project.regional}</span>
-                            <h1 class="text-3xl font-bold text-slate-800">${project.title}</h1>
-                            <p class="text-slate-600 text-sm mt-1"><i class="far fa-calendar mr-1"></i> ${app.formatDate(project.event_date)} <span class="mx-2">•</span> <i class="fas fa-map-marker-alt mr-1"></i> ${project.location}</p>
-                        </div>
-                    </div>
-
-                    <!-- STEPPER TABS -->
+                    <div class="flex items-center gap-2 text-sm text-slate-500 mb-4"><button onclick="app.showPage('projects')" class="hover:text-green-600 transition"><i class="fas fa-arrow-left mr-1"></i> Kembali</button></div>
+                    <div class="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-6"><div><span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">${project.regional}</span><h1 class="text-3xl font-bold text-slate-800">${project.title}</h1><p class="text-slate-600 text-sm mt-1"><i class="far fa-calendar mr-1"></i> ${app.formatDate(project.event_date)} <span class="mx-2">•</span> <i class="fas fa-map-marker-alt mr-1"></i> ${project.location}</p></div></div>
                     <div class="flex items-center justify-between w-full overflow-x-auto pb-4 mb-2 custom-scrollbar space-x-2">
                         ${SOP_STEPS.map((step, idx) => {
                             const isActive = app.activeStepTab === step.id;
                             const isDone = currentStatusStep > step.id;
                             let colorClass = isActive ? 'bg-green-600 text-white shadow-md' : (isDone ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-400 border-slate-200');
-                            
-                            return `
-                                <button onclick="app.getProjectDetails('${project.id}', ${step.id})" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl border transition ${colorClass}">
-                                    <div class="text-xs font-bold mb-1">Tahap ${step.id}</div>
-                                    <div class="text-[10px] whitespace-nowrap">${step.name}</div>
-                                </button>
-                            `;
+                            return `<button onclick="app.getProjectDetails('${project.id}', ${step.id})" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl border transition ${colorClass}"><div class="text-xs font-bold mb-1">Tahap ${step.id}</div><div class="text-[10px] whitespace-nowrap">${step.name}</div></button>`;
                         }).join('')}
                     </div>
-
-                    <!-- DYNAMIC CONTENT AREA -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
-                        <div class="lg:col-span-2">
-                            ${stepContent}
-                        </div>
-                        
-                        <!-- Right Sidebar (Always Visible) -->
-                        <div class="space-y-6">
-                             <div class="bg-white rounded-2xl p-6 border border-slate-200">
-                                <h3 class="font-bold mb-4 text-sm uppercase text-slate-500">Timeline Global</h3>
-                                ${app.renderGanttChart(project.event_date)}
-                            </div>
-                        </div>
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6 relative">
+                        <div class="absolute top-4 right-4"><button onclick="app.deleteProject('${project.id}')" class="text-slate-300 hover:text-red-500 bg-white p-2 rounded-full shadow-sm hover:shadow transition border border-slate-100" title="Hapus Proyek"><i class="fas fa-trash"></i></button></div>
+                        ${stepContent}
                     </div>
+                    <div class="mt-6"><div class="bg-white rounded-2xl p-6 border border-slate-200"><h3 class="font-bold mb-4 text-sm uppercase text-slate-500">Timeline Global</h3>${app.renderGanttChart(project.event_date)}</div></div>
                 `;
                 container.innerHTML = html;
             },
 
-            // --- ACTIONS ---
             updateField: async (id, field, value) => {
                 const { error } = await supabase.from('projects').update({ [field]: value }).eq('id', id);
                 if(error) app.showToast("Gagal update"); else app.showToast("Disimpan!");
             },
-            updateProjectStatus: async (id, stepId) => {
-                const step = SOP_STEPS.find(s => s.id === stepId);
-                if(!confirm(`Lanjut ke ${step.fullStatus}?`)) return;
-                const { error } = await supabase.from('projects').update({ status: step.fullStatus }).eq('id', id);
-                if(error) app.showToast("Error"); else { app.showToast("Status Updated!"); app.getProjectDetails(id); }
+            updateMultiField: async (id, updates) => {
+                const { error } = await supabase.from('projects').update(updates).eq('id', id);
+                if(error) app.showToast("Gagal update"); else app.showToast("Disimpan!");
             },
             
-            // --- STANDARD UTILS (Create, Delete, Render List) ---
+            // --- PERBAIKAN FUNGSI DELETE PROJECT ---
+            deleteProject: async (id) => { 
+                if(!confirm("Yakin hapus proyek ini? Semua data terkait akan dihapus permanen.")) return;
+                
+                try {
+                    // Hapus data terkait terlebih dahulu
+                    const tables = ['rundowns', 'budgets', 'volunteers', 'project_files'];
+                    
+                    for (const table of tables) {
+                        const { error } = await supabase
+                            .from(table)
+                            .delete()
+                            .eq('project_id', id);
+                            
+                        if (error) {
+                            console.error(`Error deleting from ${table}:`, error);
+                        }
+                    }
+                    
+                    // Hapus proyek utama
+                    const { error } = await supabase
+                        .from('projects')
+                        .delete()
+                        .eq('id', id);
+                    
+                    if (error) {
+                        throw new Error(error.message);
+                    }
+                    
+                    app.showToast("Proyek berhasil dihapus.");
+                    app.activeProjectId = null;
+                    await app.fetchProjects();
+                    app.showPage('projects');
+                    
+                } catch (error) {
+                    console.error("Delete error:", error);
+                    app.showToast("Gagal menghapus proyek: " + error.message);
+                }
+            },
+
+            // Fungsi delete untuk item lain (untuk konsistensi)
+            deleteItem: async (table, id) => { 
+                if(!confirm("Yakin hapus item ini?")) return;
+                
+                const { error } = await supabase.from(table).delete().eq('id', id);
+                
+                if (error) { 
+                    console.error("Delete error:", error);
+                    app.showToast("Gagal hapus: " + error.message); 
+                } else { 
+                    app.showToast("Berhasil dihapus.");
+                    if(table === 'projects') {
+                        app.activeProjectId = null;
+                        await app.fetchProjects();
+                        app.showPage('projects');
+                    } else {
+                        app.getProjectDetails(app.activeProjectId);
+                    }
+                }
+            },
+
+            saveAndNext: async (id, nextStepId, updates) => {
+                const step = SOP_STEPS.find(s => s.id === nextStepId);
+                if (updates) {
+                    const { error } = await supabase.from('projects').update(updates).eq('id', id);
+                    if(error) { app.showToast("Gagal simpan data."); return; }
+                }
+                const { error } = await supabase.from('projects').update({ status: step.fullStatus }).eq('id', id);
+                if(!error) {
+                    app.showToast("Berhasil lanjut ke Tahap " + nextStepId);
+                    app.getProjectDetails(id, nextStepId);
+                } else {
+                    app.showToast("Error status: " + error.message);
+                }
+            },
+
             renderDashboard: (c) => { 
                 const total = app.projects.length;
-                const done = app.projects.filter(p=>p.status.includes('Tahap 6')).length;
+                const done = app.projects.filter(p=>p.status.includes('Tahap 7')).length;
                 const reg = [...new Set(app.projects.map(p=>p.regional||'Lain'))];
-                const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
                 c.innerHTML=`<div class="mb-8"><h2 class="text-2xl font-bold">Dashboard</h2></div>
                 <div class="grid grid-cols-3 gap-4 mb-8">
                     <div class="bg-white p-4 rounded-xl border shadow-sm">Total: ${total}</div>
@@ -413,7 +364,8 @@
             renderProjectList: (c) => {
                 c.innerHTML = `<div class="flex justify-between mb-6"><h2 class="text-2xl font-bold">Proyek</h2><button onclick="app.toggleModal('modal-project')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">+ Baru</button></div>
                 <div class="grid gap-4">${app.projects.map(p=>`
-                    <div onclick="app.getProjectDetails('${p.id}')" class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition">
+                    <div onclick="app.getProjectDetails('${p.id}')" class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition relative group">
+                        <div class="absolute top-4 right-4 z-10"><button onclick="event.stopPropagation(); app.deleteProject('${p.id}')" class="bg-white text-slate-400 hover:text-red-600 p-2 rounded-full shadow-sm hover:shadow transition"><i class="fas fa-trash"></i></button></div>
                         <div class="flex justify-between mb-2"><span class="bg-slate-800 text-white text-xs px-2 py-1 rounded">${p.regional}</span><span class="text-xs text-slate-500">${app.formatDate(p.event_date)}</span></div>
                         <h3 class="font-bold text-lg">${p.title}</h3>
                         <div class="text-sm text-slate-500 mt-2">${p.status}</div>
@@ -424,7 +376,7 @@
             handleFormSubmit: async (f,t,cb) => { const fd=new FormData(f); const d=Object.fromEntries(fd); delete d.id; const {error}=await supabase.from(t).insert([d]); if(!error){app.showToast("Saved"); app.toggleModal(f.closest('.fixed').id); f.reset(); cb();} },
             toggleModal: (id) => document.getElementById(id).classList.toggle('hidden'),
             openGeneric: (t,h,fn) => { document.getElementById('modal-generic-title').innerText=t; document.getElementById('modal-generic-content').innerHTML=h; if(fn) document.querySelector('#modal-generic-content form').onsubmit=fn; app.toggleModal('modal-generic'); },
-            openBudgetModal: () => app.openGeneric("Tambah Budget", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'budgets')"><input name="item_name" placeholder="Item" class="w-full border p-2 rounded" required><div class="flex gap-2"><input name="quantity" placeholder="Qty" class="w-full border p-2 rounded"><input name="unit_price" placeholder="Harga" class="w-full border p-2 rounded"></div><input name="total_price" placeholder="Total" class="w-full border p-2 rounded"><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
+            openBudgetModal: () => app.openGeneric("Tambah Budget", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'budgets')"><input name="item_name" placeholder="Item" class="w-full border p-2 rounded" required><div class="flex gap-2"><input id="bq" name="quantity" placeholder="Qty" class="w-full border p-2 rounded"><input id="bp" name="unit_price" placeholder="Harga" class="w-full border p-2 rounded"></div><input id="bt" name="total_price" placeholder="Total" class="w-full border p-2 rounded bg-slate-50" readonly><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
             openVolunteerModal: () => app.openGeneric("Tambah Divisi", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'volunteers')"><input name="role_name" placeholder="Nama Divisi" class="w-full border p-2 rounded" required><input name="count" placeholder="Jumlah" class="w-full border p-2 rounded"><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
             openRundownModal: () => app.openGeneric("Tambah Rundown", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'rundowns')"><div class="flex gap-2"><input name="time_start" placeholder="Start" class="w-full border p-2 rounded"><input name="time_end" placeholder="End" class="w-full border p-2 rounded"></div><input name="activity" placeholder="Kegiatan" class="w-full border p-2 rounded" required><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
             handleSubItem: async (f, table) => { const fd=new FormData(f); const d=Object.fromEntries(fd); d.project_id=app.activeProjectId; const {error}=await supabase.from(table).insert([d]); if(!error){app.showToast("Item Added"); app.toggleModal('modal-generic'); app.getProjectDetails(app.activeProjectId);} },
@@ -432,9 +384,10 @@
             showToast: (m) => { const t=document.getElementById('toast'); document.getElementById('toast-msg').innerText=m; t.classList.remove('translate-x-full'); setTimeout(()=>t.classList.add('translate-x-full'),3000); },
             formatDate: (s) => s ? new Date(s).toLocaleDateString('id-ID') : '-',
             formatCurrency: (n) => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n),
-            generateBandungData: async () => { if(confirm("Generate?")){ const {data:p}=await supabase.from('projects').insert([{title:"Bandung Menyapa #3",regional:"Bandung",event_date:"2025-12-21",status:"Tahap 2: Media & Finance"}]).select().single(); if(p){ await supabase.from('budgets').insert([{project_id:p.id,item_name:"Konsumsi",total_price:500000}]); app.showToast("Done"); app.fetchProjects(); } } }
+            generateBandungData: async () => { if(confirm("Generate?")){ const {data:p}=await supabase.from('projects').insert([{title:"Bandung Menyapa #3",regional:"Bandung",event_date:"2025-12-21",status:"Tahap 2: Persetujuan Konsep"}]).select().single(); if(p){ await supabase.from('budgets').insert([{project_id:p.id,item_name:"Konsumsi",total_price:500000}]); app.showToast("Done"); app.fetchProjects(); } } }
         };
         app.init();
+        document.addEventListener('input', (e) => { if(e.target.id === 'bq' || e.target.id === 'bp') { const q = parseFloat(document.getElementById('bq').value)||0; const p = parseFloat(document.getElementById('bp').value)||0; document.getElementById('bt').value = q*p; } });
     </script>
 </body>
 </html>
