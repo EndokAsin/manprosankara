@@ -9,344 +9,708 @@
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f4f6; }
-        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
         .loading-spinner {
-            border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%;
-            width: 30px; height: 30px; animation: spin 1s linear infinite;
+            border: 3px solid #f3f3f3; border-top: 3px solid #16a34a; border-radius: 50%;
+            width: 24px; height: 24px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Hide scrollbar for clean UI */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Interactive Elements */
-        .hover-trigger .hover-target { visibility: hidden; opacity: 0; transition: opacity 0.2s; }
-        .hover-trigger:hover .hover-target { visibility: visible; opacity: 1; }
+        /* Gantt Chart Bars */
+        .gantt-bar { transition: all 0.3s ease; }
+        .gantt-bar:hover { filter: brightness(0.95); transform: translateY(-1px); }
+
+        /* Stepper */
+        .step-connector { flex-grow: 1; height: 2px; background-color: #e2e8f0; margin: 0 8px; }
+        .step-active .step-connector { background-color: #16a34a; }
+        .step-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; transition: all 0.3s; }
+        .step-active .step-circle { background-color: #16a34a; color: white; box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.2); }
+        .step-inactive .step-circle { background-color: #e2e8f0; color: #64748b; }
+        .step-completed .step-circle { background-color: #16a34a; color: white; }
     </style>
 </head>
-<body class="text-gray-800">
+<body class="text-slate-800 antialiased">
 
     <!-- Notification Toast -->
     <div id="toast" class="fixed top-5 right-5 z-50 transform transition-transform translate-x-full duration-300">
-        <div class="bg-white border-l-4 border-green-500 rounded shadow-lg p-4 flex items-center">
-            <i class="fas fa-check-circle text-green-500 mr-3"></i>
-            <span id="toast-msg">Notification</span>
+        <div class="bg-white border-l-4 border-green-500 rounded-lg shadow-xl p-4 flex items-center pr-8">
+            <i class="fas fa-check-circle text-green-500 mr-3 text-xl"></i>
+            <div>
+                <h4 class="font-bold text-sm text-gray-800">Notifikasi</h4>
+                <span id="toast-msg" class="text-sm text-gray-600">Message</span>
+            </div>
         </div>
     </div>
 
     <div class="flex h-screen overflow-hidden">
         
         <!-- Sidebar -->
-        <aside class="w-64 bg-white border-r hidden md:flex flex-col z-10">
-            <div class="p-6 flex items-center border-b">
-                <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3">S</div>
-                <h1 class="text-xl font-bold tracking-tight text-green-900">SANKARA</h1>
+        <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+            <div class="p-6 flex items-center border-b border-slate-100">
+                <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-lg shadow-green-200">S</div>
+                <h1 class="text-xl font-bold tracking-tight text-slate-800">SANKARA <span class="text-green-600">PM</span></h1>
             </div>
-            <nav class="flex-1 overflow-y-auto py-4">
-                <ul class="space-y-1 px-3">
-                    <li>
-                        <button onclick="app.showPage('dashboard')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-green-50 text-gray-600 hover:text-green-700 font-medium transition flex items-center">
-                            <i class="fas fa-home w-6"></i> Dashboard
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="app.showPage('projects')" class="w-full text-left px-4 py-3 rounded-lg bg-green-50 text-green-700 font-medium transition flex items-center">
-                            <i class="fas fa-project-diagram w-6"></i> Proyek
-                        </button>
-                    </li>
-                </ul>
-            </nav>
-            <div class="p-4 border-t">
-                <button onclick="app.generateBandungData()" class="w-full bg-green-100 text-green-800 text-xs py-2 px-3 rounded hover:bg-green-200 transition">
-                    <i class="fas fa-database mr-1"></i> Generate "Bandung Menyapa"
+            <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+                <button onclick="app.showPage('dashboard')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-600 hover:text-green-700 font-medium transition flex items-center group">
+                    <i class="fas fa-chart-pie w-6 text-slate-400 group-hover:text-green-600 transition"></i> Dashboard
                 </button>
-                <div class="mt-2 text-xs text-gray-400 text-center">Connected to Supabase</div>
+                <button onclick="app.showPage('projects')" class="w-full text-left px-4 py-3 rounded-xl bg-green-50 text-green-700 font-medium transition flex items-center shadow-sm shadow-green-100 ring-1 ring-green-200">
+                    <i class="fas fa-layer-group w-6"></i> Manajemen Proyek
+                </button>
+            </nav>
+            <div class="p-4 border-t border-slate-100 bg-slate-50">
+                <button onclick="app.generateBandungData()" class="w-full bg-white border border-green-200 text-green-700 text-xs py-2.5 px-3 rounded-lg hover:bg-green-50 transition font-semibold shadow-sm flex justify-center items-center">
+                    <i class="fas fa-magic mr-2"></i> Generate Dummy Data
+                </button>
+                <div class="mt-3 flex items-center justify-center text-[10px] text-slate-400">
+                    <span class="w-2 h-2 bg-green-500 rounded-full mr-1.5 animate-pulse"></span> Connected to Supabase
+                </div>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#f8fafc]">
             
             <!-- Mobile Header -->
-            <header class="md:hidden bg-white border-b p-4 flex justify-between items-center">
-                <div class="font-bold text-green-700">SANKARA</div>
-                <button class="text-gray-600"><i class="fas fa-bars"></i></button>
+            <header class="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
+                <div class="font-bold text-green-700 flex items-center gap-2">
+                    <div class="w-6 h-6 bg-green-600 rounded text-white flex items-center justify-center text-xs">S</div>
+                    SANKARA
+                </div>
+                <button class="text-slate-600"><i class="fas fa-bars"></i></button>
             </header>
 
             <!-- Content Area -->
-            <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8">
-                <!-- Dynamic Content Loaded Here -->
-                <div class="flex justify-center items-center h-full">
-                    <div class="loading-spinner"></div>
+            <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+                <div class="flex flex-col justify-center items-center h-full text-slate-400">
+                    <div class="loading-spinner mb-3"></div>
+                    <span class="text-sm font-medium">Memuat Data...</span>
                 </div>
             </div>
-
         </main>
     </div>
 
     <!-- MODALS -->
 
-    <!-- Modal Project (Create/Edit) -->
-    <div id="modal-project" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
-                <h3 class="font-bold text-lg" id="modal-project-title">Proyek Baru</h3>
-                <button onclick="app.toggleModal('modal-project')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+    <!-- Modal Project -->
+    <div id="modal-project" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
+            <div class="bg-white px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-800" id="modal-project-title">Proyek Baru</h3>
+                <button onclick="app.toggleModal('modal-project')" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
             <form id="form-project" class="p-6 space-y-4">
                 <input type="hidden" name="id" id="project-id">
+                <input type="hidden" name="step" id="project-step" value="1">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Kegiatan</label>
-                    <input type="text" name="title" id="project-title" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nama Kegiatan</label>
+                    <input type="text" name="title" id="project-title" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Regional</label>
-                        <select name="regional" id="project-regional" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Regional</label>
+                        <select name="regional" id="project-regional" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                             <option value="Bandung">Bandung</option>
                             <option value="Jakarta">Jakarta</option>
                             <option value="Surabaya">Surabaya</option>
+                            <option value="Yogyakarta">Yogyakarta</option>
                             <option value="Lainnya">Lainnya</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Project Leader</label>
-                        <input type="text" name="leader" id="project-leader" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Project Leader</label>
+                        <input type="text" name="leader" id="project-leader" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tema</label>
-                    <input type="text" name="theme" id="project-theme" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tema</label>
+                    <input type="text" name="theme" id="project-theme" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
-                        <input type="date" name="event_date" id="project-date" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tanggal (D-Day)</label>
+                        <input type="date" name="event_date" id="project-date" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
-                        <input type="text" name="location" id="project-location" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Lokasi</label>
+                        <input type="text" name="location" id="project-location" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select name="status" id="project-status" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
-                        <option value="Planning">Planning</option>
-                        <option value="Ongoing">Ongoing</option>
-                        <option value="Completed">Completed</option>
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Status Tahapan (SOP)</label>
+                    <select name="status" id="project-status" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
+                        <option value="Tahap 1: Pra-Persiapan">1. Pra-Persiapan (Survey)</option>
+                        <option value="Tahap 2: Persetujuan Konsep">2. Persetujuan Konsep (RnD)</option>
+                        <option value="Tahap 3: Media & Administrasi">3. Media & Administrasi</option>
+                        <option value="Tahap 4: Rekrutmen Delegasi">4. Rekrutmen Delegasi</option>
+                        <option value="Tahap 5: First Meet">5. First Meet</option>
+                        <option value="Tahap 6: Pelaksanaan">6. Pelaksanaan (D-Day)</option>
+                        <option value="Tahap 7: Pelaporan Akhir">7. Pelaporan & Evaluasi</option>
                     </select>
                 </div>
-                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition">Simpan Proyek</button>
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-green-200">Simpan Proyek</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal Rundown -->
-    <div id="modal-rundown" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
-                <h3 class="font-bold text-lg" id="modal-rundown-title">Item Rundown</h3>
-                <button onclick="app.toggleModal('modal-rundown')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+    <!-- Shared Modal Structure for Smaller Items -->
+    <div id="modal-generic" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-800" id="modal-generic-title">Judul Modal</h3>
+                <button onclick="app.toggleModal('modal-generic')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
-            <form id="form-rundown" class="p-6 space-y-4">
-                <input type="hidden" name="id" id="rundown-id">
-                <input type="hidden" name="project_id" id="rundown-project-id">
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Mulai</label>
-                        <input type="text" name="time_start" id="rundown-start" placeholder="08:00" class="w-full border rounded px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Selesai</label>
-                        <input type="text" name="time_end" id="rundown-end" placeholder="09:00" class="w-full border rounded px-3 py-2">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Kegiatan</label>
-                    <input type="text" name="activity" id="rundown-activity" required class="w-full border rounded px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Keterangan/PIC</label>
-                    <textarea name="description" id="rundown-desc" rows="2" class="w-full border rounded px-3 py-2"></textarea>
-                </div>
-                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan Rundown</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Budget -->
-    <div id="modal-budget" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
-                <h3 class="font-bold text-lg" id="modal-budget-title">Item Budget</h3>
-                <button onclick="app.toggleModal('modal-budget')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            <div id="modal-generic-content" class="p-6">
+                <!-- Content injected dynamically -->
             </div>
-            <form id="form-budget" class="p-6 space-y-4">
-                <input type="hidden" name="id" id="budget-id">
-                <input type="hidden" name="project_id" id="budget-project-id">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Barang</label>
-                    <input type="text" name="item_name" id="budget-item" required class="w-full border rounded px-3 py-2">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Jumlah (Qty)</label>
-                        <input type="text" name="quantity" id="budget-qty" placeholder="Misal: 10 Pcs" class="w-full border rounded px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Harga Satuan</label>
-                        <input type="number" name="unit_price" id="budget-price" class="w-full border rounded px-3 py-2">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Total Harga</label>
-                    <input type="number" name="total_price" id="budget-total" class="w-full border rounded px-3 py-2 bg-gray-50">
-                    <p class="text-xs text-gray-400 mt-1">*Otomatis dihitung jika unit & qty (angka) diisi.</p>
-                </div>
-                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan Budget</button>
-            </form>
         </div>
     </div>
-
-    <!-- Modal Volunteer -->
-    <div id="modal-volunteer" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
-                <h3 class="font-bold text-lg" id="modal-volunteer-title">Divisi Volunteer</h3>
-                <button onclick="app.toggleModal('modal-volunteer')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
-            </div>
-            <form id="form-volunteer" class="p-6 space-y-4">
-                <input type="hidden" name="id" id="volunteer-id">
-                <input type="hidden" name="project_id" id="volunteer-project-id">
-                <div class="flex gap-4">
-                    <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nama Divisi</label>
-                        <input type="text" name="role_name" id="volunteer-role" required class="w-full border rounded px-3 py-2">
-                    </div>
-                    <div class="w-24">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
-                        <input type="number" name="count" id="volunteer-count" class="w-full border rounded px-3 py-2">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Jobdesk</label>
-                    <textarea name="jobdesk" id="volunteer-jobdesk" rows="3" class="w-full border rounded px-3 py-2"></textarea>
-                </div>
-                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan Divisi</button>
-            </form>
-        </div>
-    </div>
-
 
     <script>
         // --- KONFIGURASI SUPABASE ---
-        // Sesuai input user
         const SUPABASE_URL = 'https://ruehfvjwdasqpzmroaau.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
-        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- SOP STEPS DEFINITION ---
+        const SOP_STEPS = [
+            { id: 1, name: "Pra-Persiapan", desc: "Survey & Proposal Awal" },
+            { id: 2, name: "Persetujuan", desc: "Review RnD & RAB Final" },
+            { id: 3, name: "Media & Admin", desc: "Publikasi & Pencairan Dana" },
+            { id: 4, name: "Rekrutmen", desc: "Open Recruitment Delegasi" },
+            { id: 5, name: "First Meet", desc: "Koordinasi Teknis" },
+            { id: 6, name: "Pelaksanaan", desc: "Event D-Day" },
+            { id: 7, name: "Pelaporan", desc: "LPJ & Evaluasi" }
+        ];
 
         // --- APP STATE ---
         const app = {
             currentPage: 'projects',
-            activeProjectId: null, // Stores current project ID being viewed
+            activeProjectId: null,
             projects: [],
             
             init: async () => {
+                // Ensure bucket table exists (simulated via query for now or handle gracefully)
                 await app.fetchProjects();
                 app.showPage('projects');
                 
-                // --- FORM LISTENERS ---
-
-                // Project Form
+                // Form Listener (Project)
                 document.getElementById('form-project').addEventListener('submit', async (e) => {
                     e.preventDefault();
                     await app.handleFormSubmit(e.target, 'projects', app.fetchProjects);
                 });
+            },
 
-                // Rundown Form
-                document.getElementById('form-rundown').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    await app.handleFormSubmit(e.target, 'rundowns', () => app.getProjectDetails(app.activeProjectId));
-                });
-
-                // Budget Form
-                document.getElementById('form-budget').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    await app.handleFormSubmit(e.target, 'budgets', () => app.getProjectDetails(app.activeProjectId));
-                });
+            // --- NAVIGATION ---
+            showPage: (pageName) => {
+                app.currentPage = pageName;
+                const container = document.getElementById('content-area');
                 
-                // Auto-calc budget
-                const bQty = document.getElementById('budget-qty');
-                const bPrice = document.getElementById('budget-price');
-                const calc = () => {
-                    const q = parseFloat(bQty.value) || 0;
-                    const p = parseFloat(bPrice.value) || 0;
-                    if(q && p) document.getElementById('budget-total').value = q * p;
-                };
-                bQty.addEventListener('input', calc);
-                bPrice.addEventListener('input', calc);
+                if (pageName === 'dashboard') {
+                    app.renderDashboard(container);
+                } else if (pageName === 'projects') {
+                    app.activeProjectId = null;
+                    app.renderProjectList(container);
+                }
+            },
 
+            // --- DATA FUNCTIONS ---
+            fetchProjects: async () => {
+                const { data, error } = await supabase.from('projects').select('*').order('event_date', { ascending: true });
+                if (error) {
+                    console.error("Error fetching projects:", error);
+                    app.showToast("Gagal koneksi database.");
+                } else {
+                    app.projects = data;
+                }
+            },
 
-                // Volunteer Form
-                document.getElementById('form-volunteer').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    await app.handleFormSubmit(e.target, 'volunteers', () => app.getProjectDetails(app.activeProjectId));
+            getProjectDetails: async (id) => {
+                app.activeProjectId = id;
+                app.currentPage = 'detail';
+                
+                // Concurrent Fetching
+                const [proj, rundowns, budgets, volunteers, files] = await Promise.all([
+                    supabase.from('projects').select('*').eq('id', id).single(),
+                    supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', {ascending: true}),
+                    supabase.from('budgets').select('*').eq('project_id', id),
+                    supabase.from('volunteers').select('*').eq('project_id', id),
+                    supabase.from('project_files').select('*').eq('project_id', id) // Assuming this table exists, or we fail gracefully
+                ]);
+
+                if (proj.error) {
+                    app.showToast("Error loading details");
+                    return;
+                }
+
+                // Handle files error if table doesn't exist yet (backward compatibility)
+                const fileData = files.error ? [] : files.data;
+
+                app.renderProjectDetailView(proj.data, rundowns.data || [], budgets.data || [], volunteers.data || [], fileData);
+            },
+
+            // --- RENDERING VIEWS ---
+
+            renderDashboard: (container) => {
+                const total = app.projects.length;
+                const completed = app.projects.filter(p => p.status.includes('Tahap 7')).length;
+                const ongoing = total - completed;
+
+                container.innerHTML = `
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-bold text-slate-800">Dashboard Sankara</h2>
+                        <p class="text-slate-500">Overview kegiatan per regional</p>
+                    </div>
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center">
+                            <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl mr-4"><i class="fas fa-folder-open"></i></div>
+                            <div>
+                                <div class="text-slate-500 text-sm font-medium">Total Proyek</div>
+                                <div class="text-2xl font-bold text-slate-800">${total}</div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center">
+                            <div class="w-12 h-12 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center text-xl mr-4"><i class="fas fa-clock"></i></div>
+                            <div>
+                                <div class="text-slate-500 text-sm font-medium">Sedang Berjalan</div>
+                                <div class="text-2xl font-bold text-slate-800">${ongoing}</div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center">
+                            <div class="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-xl mr-4"><i class="fas fa-check-circle"></i></div>
+                            <div>
+                                <div class="text-slate-500 text-sm font-medium">Selesai</div>
+                                <div class="text-2xl font-bold text-slate-800">${completed}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderProjectList: (container) => {
+                // Group by Regional
+                const groups = app.projects.reduce((acc, project) => {
+                    const reg = project.regional || 'Lainnya';
+                    if (!acc[reg]) acc[reg] = [];
+                    acc[reg].push(project);
+                    return acc;
+                }, {});
+
+                let html = `
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800">Manajemen Proyek</h2>
+                            <p class="text-slate-500 text-sm">Monitoring kegiatan per regional</p>
+                        </div>
+                        <button onclick="app.openProjectModal()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold transition shadow-md shadow-green-200 flex items-center gap-2">
+                            <i class="fas fa-plus"></i> Buat Proyek
+                        </button>
+                    </div>
+                `;
+
+                if (Object.keys(groups).length === 0) {
+                    html += `
+                        <div class="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                            <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4 text-2xl"><i class="fas fa-folder-plus"></i></div>
+                            <p class="text-slate-500 font-medium">Belum ada proyek.</p>
+                            <button onclick="app.generateBandungData()" class="mt-2 text-green-600 hover:text-green-700 text-sm font-semibold">Generate Dummy Data</button>
+                        </div>
+                    `;
+                } else {
+                    // Iterate Regionals
+                    for (const [regional, projects] of Object.entries(groups)) {
+                        html += `
+                            <div class="mb-8 animate-fade-in-up">
+                                <div class="flex items-center gap-2 mb-4 px-1">
+                                    <span class="bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">${regional}</span>
+                                    <div class="h-[1px] bg-slate-200 flex-1"></div>
+                                </div>
+                                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
+                                                    <th class="p-4 font-semibold">Nama Kegiatan</th>
+                                                    <th class="p-4 font-semibold">Tema</th>
+                                                    <th class="p-4 font-semibold">Leader</th>
+                                                    <th class="p-4 font-semibold">Tanggal</th>
+                                                    <th class="p-4 font-semibold">Status Tahapan</th>
+                                                    <th class="p-4 font-semibold text-right">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100">
+                        `;
+                        
+                        projects.forEach(p => {
+                            // Determine active step index (1-7)
+                            const statusStr = p.status || "";
+                            let stepNum = 1;
+                            if(statusStr.includes("Tahap")) {
+                                stepNum = parseInt(statusStr.split(":")[0].replace("Tahap ", ""));
+                            }
+                            const progress = (stepNum / 7) * 100;
+                            const colorClass = stepNum === 7 ? 'bg-green-500' : 'bg-blue-500';
+
+                            html += `
+                                <tr class="hover:bg-slate-50 transition cursor-pointer group" onclick="app.getProjectDetails('${p.id}')">
+                                    <td class="p-4 font-semibold text-slate-800 group-hover:text-green-700 transition">${p.title}</td>
+                                    <td class="p-4 text-slate-600 text-sm">${p.theme || '-'}</td>
+                                    <td class="p-4 text-slate-600 text-sm flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">${p.leader.charAt(0)}</div>
+                                        ${p.leader}
+                                    </td>
+                                    <td class="p-4 text-slate-600 text-sm">${app.formatDate(p.event_date)}</td>
+                                    <td class="p-4">
+                                        <div class="w-full max-w-[140px]">
+                                            <div class="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                                                <span>Tahap ${stepNum}</span>
+                                                <span>${Math.round(progress)}%</span>
+                                            </div>
+                                            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                                <div class="${colorClass} h-1.5 rounded-full" style="width: ${progress}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-right">
+                                        <button onclick="event.stopPropagation(); app.deleteItem('projects', '${p.id}')" class="text-slate-300 hover:text-red-500 p-2 transition">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+
+                        html += `
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                container.innerHTML = html;
+            },
+
+            renderProjectDetailView: (project, rundowns, budgets, volunteers, files) => {
+                const container = document.getElementById('content-area');
+                
+                const safeProj = JSON.stringify(project).replace(/"/g, '&quot;');
+                
+                // Parse Status Step
+                let currentStep = 1;
+                if (project.status && project.status.includes('Tahap')) {
+                    currentStep = parseInt(project.status.split(':')[0].replace('Tahap ', ''));
+                }
+
+                // Calculate Totals
+                const totalBudget = budgets.reduce((sum, b) => sum + (b.total_price || 0), 0);
+                const totalVolunteers = volunteers.reduce((sum, v) => sum + (v.count || 0), 0);
+
+                let html = `
+                    <!-- Breadcrumb -->
+                    <div class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                        <button onclick="app.showPage('projects')" class="hover:text-green-600 transition">Projects</button>
+                        <i class="fas fa-chevron-right text-xs"></i>
+                        <span class="text-slate-800 font-semibold truncate">${project.title}</span>
+                    </div>
+
+                    <!-- Header -->
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition z-10">
+                            <button onclick="app.openProjectModal(${safeProj})" class="bg-white border border-slate-200 text-slate-600 hover:text-green-600 px-3 py-1.5 rounded-lg text-sm shadow-sm transition">
+                                <i class="fas fa-pen mr-1"></i> Edit Info
+                            </button>
+                        </div>
+                        <div class="flex flex-col md:flex-row justify-between md:items-start gap-4">
+                            <div>
+                                <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-3 inline-block uppercase tracking-wider">${project.regional}</span>
+                                <h1 class="text-3xl font-bold text-slate-800 mb-2">${project.title}</h1>
+                                <p class="text-slate-600"><span class="font-semibold">Tema:</span> ${project.theme}</p>
+                            </div>
+                            <div class="text-right md:text-left">
+                                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 inline-block text-right">
+                                    <div class="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">D-DAY</div>
+                                    <div class="text-xl font-bold text-slate-800">${app.formatDate(project.event_date)}</div>
+                                    <div class="text-xs text-slate-500 mt-1"><i class="fas fa-map-pin mr-1"></i> ${project.location}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 7-STEP SOP TRACKER -->
+                        <div class="mt-8 pt-6 border-t border-slate-100">
+                             <div class="flex items-center justify-between w-full overflow-x-auto pb-4 md:pb-0">
+                                ${SOP_STEPS.map((step, index) => {
+                                    let statusClass = 'step-inactive';
+                                    if (step.id < currentStep) statusClass = 'step-completed';
+                                    else if (step.id === currentStep) statusClass = 'step-active';
+                                    
+                                    const isLast = index === SOP_STEPS.length - 1;
+                                    
+                                    return `
+                                        <div class="flex flex-col items-center relative z-0 group min-w-[100px] flex-1 ${statusClass}">
+                                            <div class="step-circle mb-2 relative bg-white border-2 ${step.id <= currentStep ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-200 text-slate-400'}">
+                                                ${step.id < currentStep ? '<i class="fas fa-check"></i>' : step.id}
+                                            </div>
+                                            <div class="text-xs font-bold text-slate-700 text-center px-1">${step.name}</div>
+                                            <div class="text-[10px] text-slate-400 text-center hidden md:block">${step.desc}</div>
+                                            ${!isLast ? `<div class="absolute top-4 left-1/2 w-full h-[2px] -z-10 ${step.id < currentStep ? 'bg-green-500' : 'bg-slate-200'}"></div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Grid Layout -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
+                        
+                        <!-- LEFT COLUMN (Gantt & Rundown) -->
+                        <div class="lg:col-span-2 space-y-6">
+                            
+                            <!-- GANTT CHART (Timeline) -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                        <i class="fas fa-stream text-green-500"></i> Timeline Persiapan
+                                    </h3>
+                                    <span class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">Auto-Generated from D-Day</span>
+                                </div>
+                                <div class="space-y-4 relative">
+                                    <!-- Vertical Line for "Today" could be added here -->
+                                    ${app.renderGanttChart(project.event_date)}
+                                </div>
+                            </div>
+
+                            <!-- RUNDOWN -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                        <i class="far fa-clock text-green-500"></i> Rundown Acara
+                                    </h3>
+                                    <button onclick="app.openRundownModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1.5 rounded-lg font-bold transition">
+                                        + ITEM
+                                    </button>
+                                </div>
+                                <div class="space-y-0 relative border-l-2 border-slate-100 ml-3">
+                                    ${rundowns.length === 0 ? '<p class="text-slate-400 text-sm italic pl-6">Belum ada rundown.</p>' : ''}
+                                    ${rundowns.map(r => {
+                                        const safeR = JSON.stringify(r).replace(/"/g, '&quot;');
+                                        return `
+                                        <div class="relative pl-6 pb-6 last:pb-0 group">
+                                            <div class="absolute -left-[7px] top-1 w-3.5 h-3.5 bg-white border-2 border-green-500 rounded-full group-hover:bg-green-500 transition"></div>
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="text-xs font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 mb-1 inline-block">${r.time_start} - ${r.time_end}</span>
+                                                    <h4 class="font-bold text-slate-800">${r.activity}</h4>
+                                                    <p class="text-sm text-slate-500 mt-1">${r.description || '-'}</p>
+                                                </div>
+                                                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                                                    <button onclick="app.openRundownModal(${safeR})" class="text-blue-500 hover:text-blue-600"><i class="fas fa-pen"></i></button>
+                                                    <button onclick="app.deleteItem('rundowns', '${r.id}')" class="text-slate-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `}).join('')}
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- RIGHT COLUMN (Budget, Team, Files) -->
+                        <div class="space-y-6">
+                            
+                            <!-- FILE BUCKET -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                        <i class="fas fa-folder text-yellow-500"></i> File Bucket
+                                    </h3>
+                                    <button onclick="app.openFileModal()" class="text-xs text-blue-600 hover:underline">Upload Link</button>
+                                </div>
+                                <div class="space-y-2">
+                                    ${files.length === 0 ? '<div class="text-center py-4 bg-slate-50 rounded border border-dashed text-xs text-slate-400">Belum ada file</div>' : ''}
+                                    ${files.map(f => `
+                                        <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded group">
+                                            <a href="${f.url}" target="_blank" class="flex items-center gap-2 text-sm text-slate-700 hover:text-blue-600 truncate max-w-[200px]">
+                                                <i class="fas fa-link text-slate-400"></i> ${f.filename}
+                                            </a>
+                                            <button onclick="app.deleteItem('project_files', '${f.id}')" class="text-xs text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- BUDGET SUMMARY -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                        <i class="fas fa-wallet text-green-500"></i> Budget
+                                    </h3>
+                                    <button onclick="app.openBudgetModal()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 transition">+ Item</button>
+                                </div>
+                                <div class="text-2xl font-bold text-slate-800 mb-4">${app.formatCurrency(totalBudget)}</div>
+                                <div class="max-h-[300px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                                    ${budgets.map(b => `
+                                        <div class="flex justify-between text-sm p-2 hover:bg-slate-50 rounded border-b border-slate-50 group">
+                                            <div>
+                                                <div class="font-medium text-slate-700">${b.item_name}</div>
+                                                <div class="text-xs text-slate-400">${b.quantity} x ${(b.unit_price/1000).toFixed(0)}k</div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="font-bold text-slate-600">${app.formatCurrency(b.total_price)}</div>
+                                                <div class="flex justify-end gap-2 mt-1 opacity-0 group-hover:opacity-100 text-xs">
+                                                     <button onclick='app.openBudgetModal(${JSON.stringify(b)})' class="text-blue-500"><i class="fas fa-pen"></i></button>
+                                                     <button onclick="app.deleteItem('budgets', '${b.id}')" class="text-red-400"><i class="fas fa-trash"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- VOLUNTEER SUMMARY -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                        <i class="fas fa-users text-blue-500"></i> Tim (${totalVolunteers})
+                                    </h3>
+                                    <button onclick="app.openVolunteerModal()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 transition">+ Divisi</button>
+                                </div>
+                                <div class="space-y-3">
+                                    ${volunteers.map(v => `
+                                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 relative group">
+                                            <div class="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                                                <button onclick='app.openVolunteerModal(${JSON.stringify(v)})' class="text-blue-500 text-xs"><i class="fas fa-pen"></i></button>
+                                                <button onclick="app.deleteItem('volunteers', '${v.id}')" class="text-red-400 text-xs"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="font-bold text-slate-700 text-sm">${v.role_name}</span>
+                                                <span class="bg-white border px-1.5 py-0.5 rounded text-xs font-bold text-slate-500">${v.count}</span>
+                                            </div>
+                                            <p class="text-xs text-slate-500 line-clamp-2">${v.jobdesk || '-'}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                `;
+                container.innerHTML = html;
+            },
+
+            // --- HELPER: GANTT CHART RENDERER ---
+            renderGanttChart: (eventDateStr) => {
+                if(!eventDateStr) return '<div class="text-center text-slate-400 text-sm py-4">Tentukan tanggal acara untuk melihat timeline</div>';
+                
+                const dDay = new Date(eventDateStr);
+                
+                // Define Timeline relative to D-Day (in days)
+                const timeline = [
+                    { name: "Pra-Persiapan (Survey)", startDaysBefore: 45, duration: 7, color: "bg-purple-400" },
+                    { name: "Persetujuan Konsep & RAB", startDaysBefore: 38, duration: 5, color: "bg-blue-400" },
+                    { name: "Media & Pencairan Dana", startDaysBefore: 33, duration: 7, color: "bg-cyan-400" },
+                    { name: "Open Recruitment", startDaysBefore: 26, duration: 10, color: "bg-teal-400" },
+                    { name: "Briefing & First Meet", startDaysBefore: 14, duration: 1, color: "bg-yellow-400" },
+                    { name: "Technical Meeting", startDaysBefore: 3, duration: 1, color: "bg-orange-400" },
+                    { name: "ACARA (D-DAY)", startDaysBefore: 0, duration: 1, color: "bg-green-500" },
+                    { name: "Pelaporan Akhir", startDaysBefore: -2, duration: 5, color: "bg-slate-400" } // Negative means after
+                ];
+
+                let html = `<div class="w-full text-xs">`;
+                
+                // Header (Weeks) - Simplified
+                html += `<div class="grid grid-cols-6 gap-1 mb-2 text-slate-400 font-bold border-b pb-2 text-center">
+                    <div>W-6</div><div>W-5</div><div>W-4</div><div>W-3</div><div>W-2</div><div>W-1</div>
+                </div>`;
+
+                timeline.forEach(item => {
+                    // Logic to position bar based on 45 day window (simplified percent based on 50 days view)
+                    // 0% is D-45, 100% is D+5
+                    const viewSpan = 50; 
+                    const startPos = 45 - item.startDaysBefore; 
+                    const leftPercent = (startPos / viewSpan) * 100;
+                    const widthPercent = (item.duration / viewSpan) * 100;
+
+                    html += `
+                        <div class="mb-3">
+                            <div class="flex justify-between mb-1">
+                                <span class="font-medium text-slate-600">${item.name}</span>
+                                <span class="text-[10px] text-slate-400">
+                                    ${item.startDaysBefore > 0 ? `H-${item.startDaysBefore}` : (item.startDaysBefore == 0 ? 'H-0' : `H+${Math.abs(item.startDaysBefore)}`)}
+                                </span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 relative overflow-hidden">
+                                <div class="absolute h-full rounded-full ${item.color} gantt-bar" 
+                                     style="left: ${Math.max(0, leftPercent)}%; width: ${widthPercent}%">
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 });
+                html += `</div>`;
+                return html;
             },
 
             // --- GENERIC FORM HANDLER ---
             handleFormSubmit: async (form, tableName, refreshCallback) => {
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData.entries());
-                const id = data.id; // Check if update or insert
-                delete data.id; // Remove ID from payload for update/insert logic if needed, but Supabase upsert needs ID usually or separate logic
+                const id = data.id; 
+                delete data.id; 
                 
                 let error;
-
                 if (id) {
-                    // Update
                     const { error: err } = await supabase.from(tableName).update(data).eq('id', id);
                     error = err;
-                    app.showToast(error ? "Gagal update data" : "Data berhasil diperbarui!");
                 } else {
-                    // Insert
                     const { error: err } = await supabase.from(tableName).insert([data]);
                     error = err;
-                    app.showToast(error ? "Gagal simpan data" : "Data berhasil disimpan!");
                 }
 
-                if (!error) {
-                    // Close relevant modal
-                    if(tableName === 'projects') app.toggleModal('modal-project');
-                    else if(tableName === 'rundowns') app.toggleModal('modal-rundown');
-                    else if(tableName === 'budgets') app.toggleModal('modal-budget');
-                    else if(tableName === 'volunteers') app.toggleModal('modal-volunteer');
+                if (error) {
+                    app.showToast("Gagal menyimpan: " + error.message);
+                } else {
+                    app.showToast("Berhasil disimpan!");
+                    
+                    // Close modals
+                    document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
                     
                     form.reset();
                     if(refreshCallback) await refreshCallback();
-                    // If we updated project, refresh current view if we are inside it
-                    if(tableName === 'projects' && app.currentPage === 'detail' && app.activeProjectId) {
+                    
+                    // Specific logic to refresh detail view if active
+                    if(app.activeProjectId && tableName !== 'projects') {
                         await app.getProjectDetails(app.activeProjectId);
                     }
                 }
             },
 
-            // --- GENERIC DELETE HANDLER ---
+            // --- GENERIC DELETE ---
             deleteItem: async (table, id) => {
-                if(!confirm("Yakin ingin menghapus item ini?")) return;
-                
+                if(!confirm("Hapus item ini?")) return;
                 const { error } = await supabase.from(table).delete().eq('id', id);
-                if (error) {
-                    app.showToast("Gagal menghapus data.");
-                } else {
-                    app.showToast("Data dihapus.");
+                if (error) app.showToast("Gagal hapus");
+                else {
+                    app.showToast("Item dihapus");
                     if(table === 'projects') {
                         await app.fetchProjects();
                         app.showPage('projects');
@@ -356,8 +720,13 @@
                 }
             },
 
-            // --- MODAL HELPERS ---
-            
+            // --- MODAL OPENERS ---
+            toggleModal: (id) => {
+                const modal = document.getElementById(id);
+                if(modal.classList.contains('hidden')) modal.classList.remove('hidden');
+                else modal.classList.add('hidden');
+            },
+
             openProjectModal: (project = null) => {
                 const form = document.getElementById('form-project');
                 form.reset();
@@ -370,427 +739,164 @@
                     document.getElementById('project-theme').value = project.theme;
                     document.getElementById('project-date').value = project.event_date;
                     document.getElementById('project-location').value = project.location;
-                    document.getElementById('project-status').value = project.status || 'Planning';
+                    document.getElementById('project-status').value = project.status || 'Tahap 1: Pra-Persiapan';
                 } else {
-                    document.getElementById('modal-project-title').innerText = "Buat Proyek Baru";
+                    document.getElementById('modal-project-title').innerText = "Proyek Baru";
                     document.getElementById('project-id').value = "";
                 }
                 app.toggleModal('modal-project');
             },
 
+            // Simplified Generic Modals for Sub-items
+            openGenericForm: (title, formHtml, submitHandler) => {
+                document.getElementById('modal-generic-title').innerText = title;
+                const content = document.getElementById('modal-generic-content');
+                content.innerHTML = formHtml;
+                
+                const form = content.querySelector('form');
+                form.addEventListener('submit', submitHandler);
+                
+                app.toggleModal('modal-generic');
+            },
+
             openRundownModal: (item = null) => {
-                document.getElementById('form-rundown').reset();
-                document.getElementById('rundown-project-id').value = app.activeProjectId;
-                if(item) {
-                    document.getElementById('rundown-id').value = item.id;
-                    document.getElementById('rundown-start').value = item.time_start;
-                    document.getElementById('rundown-end').value = item.time_end;
-                    document.getElementById('rundown-activity').value = item.activity;
-                    document.getElementById('rundown-desc').value = item.description;
-                    document.getElementById('modal-rundown-title').innerText = "Edit Rundown";
-                } else {
-                    document.getElementById('rundown-id').value = "";
-                    document.getElementById('modal-rundown-title').innerText = "Tambah Rundown";
-                }
-                app.toggleModal('modal-rundown');
+                const html = `
+                    <form class="space-y-4">
+                        <input type="hidden" name="id" value="${item ? item.id : ''}">
+                        <input type="hidden" name="project_id" value="${app.activeProjectId}">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="text" name="time_start" placeholder="08:00" value="${item?.time_start || ''}" class="border rounded-lg px-3 py-2 w-full text-sm">
+                            <input type="text" name="time_end" placeholder="09:00" value="${item?.time_end || ''}" class="border rounded-lg px-3 py-2 w-full text-sm">
+                        </div>
+                        <input type="text" name="activity" placeholder="Nama Kegiatan" value="${item?.activity || ''}" required class="border rounded-lg px-3 py-2 w-full">
+                        <textarea name="description" placeholder="PIC / Keterangan" rows="2" class="border rounded-lg px-3 py-2 w-full">${item?.description || ''}</textarea>
+                        <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-bold">Simpan</button>
+                    </form>
+                `;
+                app.openGenericForm(item ? "Edit Rundown" : "Tambah Rundown", html, async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'rundowns');
+                });
             },
 
             openBudgetModal: (item = null) => {
-                document.getElementById('form-budget').reset();
-                document.getElementById('budget-project-id').value = app.activeProjectId;
-                if(item) {
-                    document.getElementById('budget-id').value = item.id;
-                    document.getElementById('budget-item').value = item.item_name;
-                    document.getElementById('budget-qty').value = item.quantity;
-                    document.getElementById('budget-price').value = item.unit_price;
-                    document.getElementById('budget-total').value = item.total_price;
-                    document.getElementById('modal-budget-title').innerText = "Edit Budget";
-                } else {
-                    document.getElementById('budget-id').value = "";
-                    document.getElementById('modal-budget-title').innerText = "Tambah Budget";
-                }
-                app.toggleModal('modal-budget');
+                const html = `
+                    <form class="space-y-4">
+                        <input type="hidden" name="id" value="${item ? item.id : ''}">
+                        <input type="hidden" name="project_id" value="${app.activeProjectId}">
+                        <input type="text" name="item_name" placeholder="Nama Barang" value="${item?.item_name || ''}" required class="border rounded-lg px-3 py-2 w-full">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="text" name="quantity" id="b-qty" placeholder="Qty (10 Pcs)" value="${item?.quantity || ''}" class="border rounded-lg px-3 py-2 w-full text-sm">
+                            <input type="number" name="unit_price" id="b-price" placeholder="Harga Satuan" value="${item?.unit_price || ''}" class="border rounded-lg px-3 py-2 w-full text-sm">
+                        </div>
+                        <input type="number" name="total_price" id="b-total" placeholder="Total" value="${item?.total_price || ''}" class="border rounded-lg px-3 py-2 w-full bg-slate-50">
+                        <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-bold">Simpan</button>
+                    </form>
+                `;
+                app.openGenericForm(item ? "Edit Budget" : "Tambah Budget", html, async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'budgets');
+                });
+                // Simple auto-calc hook
+                setTimeout(() => {
+                    const q = document.getElementById('b-qty');
+                    const p = document.getElementById('b-price');
+                    const t = document.getElementById('b-total');
+                    const calc = () => { if(parseFloat(q.value) && parseFloat(p.value)) t.value = parseFloat(q.value) * parseFloat(p.value); };
+                    if(q && p) { q.addEventListener('input', calc); p.addEventListener('input', calc); }
+                }, 100);
             },
 
             openVolunteerModal: (item = null) => {
-                document.getElementById('form-volunteer').reset();
-                document.getElementById('volunteer-project-id').value = app.activeProjectId;
-                if(item) {
-                    document.getElementById('volunteer-id').value = item.id;
-                    document.getElementById('volunteer-role').value = item.role_name;
-                    document.getElementById('volunteer-count').value = item.count;
-                    document.getElementById('volunteer-jobdesk').value = item.jobdesk;
-                    document.getElementById('modal-volunteer-title').innerText = "Edit Divisi";
-                } else {
-                    document.getElementById('volunteer-id').value = "";
-                    document.getElementById('modal-volunteer-title').innerText = "Tambah Divisi";
-                }
-                app.toggleModal('modal-volunteer');
-            },
-
-            // --- NAVIGATION & UI ---
-            showPage: (pageName) => {
-                app.currentPage = pageName;
-                const container = document.getElementById('content-area');
-                
-                if (pageName === 'dashboard') {
-                    app.activeProjectId = null;
-                    const totalProjects = app.projects.length;
-                    const upcoming = app.projects.filter(p => new Date(p.event_date) > new Date()).length;
-                    
-                    container.innerHTML = `
-                        <h2 class="text-2xl font-bold mb-6 text-gray-800">Dashboard Overview</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
-                                <div class="text-gray-500 text-sm">Total Proyek</div>
-                                <div class="text-3xl font-bold text-gray-800">${totalProjects}</div>
-                            </div>
-                            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
-                                <div class="text-gray-500 text-sm">Akan Datang</div>
-                                <div class="text-3xl font-bold text-gray-800">${upcoming}</div>
-                            </div>
+                 const html = `
+                    <form class="space-y-4">
+                        <input type="hidden" name="id" value="${item ? item.id : ''}">
+                        <input type="hidden" name="project_id" value="${app.activeProjectId}">
+                        <div class="flex gap-2">
+                             <input type="text" name="role_name" placeholder="Nama Divisi" value="${item?.role_name || ''}" required class="border rounded-lg px-3 py-2 w-full">
+                             <input type="number" name="count" placeholder="Jml" value="${item?.count || ''}" class="border rounded-lg px-3 py-2 w-20">
                         </div>
-                    `;
-                } else if (pageName === 'projects') {
-                    app.activeProjectId = null;
-                    app.renderProjectList(container);
-                }
+                        <textarea name="jobdesk" placeholder="Jobdesk Utama" rows="3" class="border rounded-lg px-3 py-2 w-full">${item?.jobdesk || ''}</textarea>
+                        <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-bold">Simpan</button>
+                    </form>
+                `;
+                app.openGenericForm(item ? "Edit Divisi" : "Tambah Divisi", html, async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'volunteers');
+                });
             },
 
-            toggleModal: (id) => {
-                const modal = document.getElementById(id);
-                if (modal.classList.contains('hidden')) {
-                    modal.classList.remove('hidden');
-                } else {
-                    modal.classList.add('hidden');
-                }
+            openFileModal: () => {
+                 const html = `
+                    <form class="space-y-4">
+                        <input type="hidden" name="project_id" value="${app.activeProjectId}">
+                        <input type="text" name="filename" placeholder="Nama Dokumen (misal: Proposal)" required class="border rounded-lg px-3 py-2 w-full">
+                        <input type="url" name="url" placeholder="Link Google Drive / Doc" required class="border rounded-lg px-3 py-2 w-full">
+                        <div class="text-xs text-slate-400">Pastikan link dapat diakses publik/tim.</div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">Simpan Link</button>
+                    </form>
+                `;
+                app.openGenericForm("Upload Link File", html, async (e) => {
+                    e.preventDefault();
+                    // Create table if not exists logic implicitly handled by Supabase usually if setup, else error
+                    await app.handleFormSubmit(e.target, 'project_files');
+                });
             },
 
+            // --- UTILS ---
             showToast: (msg) => {
                 const toast = document.getElementById('toast');
                 document.getElementById('toast-msg').innerText = msg;
                 toast.classList.remove('translate-x-full');
-                setTimeout(() => {
-                    toast.classList.add('translate-x-full');
-                }, 3000);
+                setTimeout(() => toast.classList.add('translate-x-full'), 3000);
             },
 
-            formatCurrency: (num) => {
-                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num);
-            },
+            formatCurrency: (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num),
+            formatDate: (str) => { if(!str) return '-'; return new Date(str).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}); },
 
-            formatDate: (dateString) => {
-                if(!dateString) return '-';
-                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-                return new Date(dateString).toLocaleDateString('id-ID', options);
-            },
-
-            // --- DATA FUNCTIONS ---
-
-            fetchProjects: async () => {
-                const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-                if (error) {
-                    console.error("Error fetching projects:", error);
-                    app.showToast("Gagal mengambil data proyek. Cek console.");
-                } else {
-                    app.projects = data;
-                }
-            },
-
-            getProjectDetails: async (id) => {
-                app.activeProjectId = id;
-                app.currentPage = 'detail';
-                
-                // Fetch basic info, rundown, budget, volunteers concurrently
-                const [proj, rundowns, budgets, volunteers] = await Promise.all([
-                    supabase.from('projects').select('*').eq('id', id).single(),
-                    supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', {ascending: true}),
-                    supabase.from('budgets').select('*').eq('project_id', id),
-                    supabase.from('volunteers').select('*').eq('project_id', id)
-                ]);
-
-                if (proj.error) {
-                    app.showToast("Error loading details");
-                    return;
-                }
-
-                app.renderProjectDetailView(proj.data, rundowns.data || [], budgets.data || [], volunteers.data || []);
-            },
-
-            // --- RENDERING ---
-
-            renderProjectList: (container) => {
-                let html = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">Daftar Proyek Sankara</h2>
-                        <button onclick="app.openProjectModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
-                            <i class="fas fa-plus mr-2"></i> Buat Proyek
-                        </button>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                `;
-
-                if (app.projects.length === 0) {
-                    html += `<div class="col-span-3 text-center py-10 text-gray-500">Belum ada proyek. Klik tombol "Buat Proyek" atau "Generate Bandung" di sidebar.</div>`;
-                } else {
-                    app.projects.forEach(p => {
-                        html += `
-                            <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition p-5 cursor-pointer relative group" onclick="app.getProjectDetails('${p.id}')">
-                                <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
-                                    <button onclick="event.stopPropagation(); app.deleteItem('projects', '${p.id}')" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-trash"></i></button>
-                                </div>
-                                <div class="flex justify-between items-start mb-3">
-                                    <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded uppercase tracking-wide">${p.regional || 'Umum'}</span>
-                                    <span class="text-xs text-gray-400"><i class="far fa-calendar-alt mr-1"></i> ${p.event_date || '-'}</span>
-                                </div>
-                                <h3 class="text-lg font-bold text-gray-800 mb-1 leading-tight">${p.title}</h3>
-                                <p class="text-sm text-gray-500 mb-4 line-clamp-2">${p.theme || 'Tidak ada tema'}</p>
-                                <div class="flex items-center text-sm text-gray-600 border-t pt-3">
-                                    <div class="flex-1">
-                                        <i class="fas fa-user-tie text-green-600 mr-1"></i> ${p.leader || '-'}
-                                    </div>
-                                    <div>
-                                        <i class="fas fa-chevron-right text-gray-300"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-                html += `</div>`;
-                container.innerHTML = html;
-            },
-
-            renderProjectDetailView: (project, rundowns, budgets, volunteers) => {
-                const container = document.getElementById('content-area');
-                
-                // Calculate Total Budget
-                const totalBudget = budgets.reduce((sum, item) => sum + (item.total_price || 0), 0);
-                
-                // Safe JSON for onclick handlers
-                const safeProj = JSON.stringify(project).replace(/"/g, '&quot;');
-
-                const html = `
-                    <div class="flex justify-between items-center mb-4">
-                        <button onclick="app.showPage('projects')" class="text-sm text-gray-500 hover:text-green-600"><i class="fas fa-arrow-left"></i> Kembali ke Daftar</button>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 relative group">
-                        <!-- Edit Project Button -->
-                        <div class="absolute top-4 right-4 z-10">
-                            <button onclick="app.openProjectModal(${safeProj})" class="bg-white bg-opacity-20 hover:bg-opacity-100 hover:text-green-700 text-white p-2 rounded-full transition backdrop-blur-sm">
-                                <i class="fas fa-pen"></i>
-                            </button>
-                        </div>
-
-                        <div class="bg-green-600 p-6 text-white relative">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <span class="bg-green-700 bg-opacity-50 text-white text-xs px-2 py-1 rounded mb-2 inline-block">${project.regional}</span>
-                                    <h1 class="text-3xl font-bold">${project.title}</h1>
-                                    <p class="opacity-90 mt-1">${project.theme}</p>
-                                </div>
-                                <div class="text-right mt-8 md:mt-0">
-                                    <div class="text-2xl font-bold">${app.formatDate(project.event_date)}</div>
-                                    <div class="text-sm opacity-75"><i class="fas fa-map-marker-alt mr-1"></i> ${project.location}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Project Leader</h4>
-                                <p class="font-semibold text-lg text-gray-800">${project.leader}</p>
-                            </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Total Budget</h4>
-                                <p class="font-semibold text-lg text-green-600">${app.formatCurrency(totalBudget)}</p>
-                            </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Status</h4>
-                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-semibold">${project.status}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tabs/Sections -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-                        
-                        <!-- RUNDOWN SECTION -->
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-full flex flex-col">
-                            <div class="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 class="text-lg font-bold text-gray-800"><i class="far fa-clock text-green-600 mr-2"></i> Rundown</h3>
-                                <button onclick="app.openRundownModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded font-bold transition">
-                                    <i class="fas fa-plus mr-1"></i> ITEM
-                                </button>
-                            </div>
-                            <div class="space-y-4 flex-1">
-                                ${rundowns.map(r => {
-                                    const safeR = JSON.stringify(r).replace(/"/g, '&quot;');
-                                    return `
-                                    <div class="flex hover-trigger group">
-                                        <div class="w-24 flex-shrink-0 text-sm font-bold text-gray-600">${r.time_start}</div>
-                                        <div class="flex-1 pb-4 border-l-2 border-green-200 pl-4 relative">
-                                            <div class="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-green-500"></div>
-                                            <div class="flex justify-between">
-                                                <div class="font-bold text-gray-800">${r.activity}</div>
-                                                <div class="hover-target">
-                                                    <button onclick="app.openRundownModal(${safeR})" class="text-blue-500 hover:text-blue-700 mr-2"><i class="fas fa-pen text-xs"></i></button>
-                                                    <button onclick="app.deleteItem('rundowns', '${r.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>
-                                                </div>
-                                            </div>
-                                            <div class="text-sm text-gray-500 mt-1">${r.description || ''}</div>
-                                        </div>
-                                    </div>
-                                `}).join('')}
-                                ${rundowns.length === 0 ? '<p class="text-gray-400 italic text-center py-4">Belum ada rundown.</p>' : ''}
-                            </div>
-                        </div>
-
-                        <!-- BUDGET SECTION -->
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-full flex flex-col">
-                            <div class="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-coins text-green-600 mr-2"></i> Budget</h3>
-                                <button onclick="app.openBudgetModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded font-bold transition">
-                                    <i class="fas fa-plus mr-1"></i> ITEM
-                                </button>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm text-left">
-                                    <thead class="bg-gray-50 text-gray-600 font-bold">
-                                        <tr>
-                                            <th class="p-2">Barang</th>
-                                            <th class="p-2 text-center">Jml</th>
-                                            <th class="p-2 text-right">Harga</th>
-                                            <th class="p-2 text-right">Total</th>
-                                            <th class="p-2 w-10"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y">
-                                        ${budgets.map(b => {
-                                            const safeB = JSON.stringify(b).replace(/"/g, '&quot;');
-                                            return `
-                                            <tr class="hover:bg-gray-50 hover-trigger group">
-                                                <td class="p-2 font-medium">${b.item_name}</td>
-                                                <td class="p-2 text-center">${b.quantity}</td>
-                                                <td class="p-2 text-right text-gray-500 text-xs">${b.unit_price > 0 ? (b.unit_price/1000).toFixed(0) + 'k' : '-'}</td>
-                                                <td class="p-2 text-right font-bold">${b.total_price > 0 ? app.formatCurrency(b.total_price) : '-'}</td>
-                                                <td class="p-2 text-right hover-target">
-                                                    <button onclick="app.openBudgetModal(${safeB})" class="text-blue-500 mr-2"><i class="fas fa-pen text-xs"></i></button>
-                                                    <button onclick="app.deleteItem('budgets', '${b.id}')" class="text-red-400"><i class="fas fa-trash text-xs"></i></button>
-                                                </td>
-                                            </tr>
-                                        `}).join('')}
-                                    </tbody>
-                                    <tfoot class="border-t-2 border-gray-200">
-                                        <tr>
-                                            <td colspan="3" class="p-2 text-right font-bold">TOTAL</td>
-                                            <td class="p-2 text-right font-bold text-green-700">${app.formatCurrency(totalBudget)}</td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- VOLUNTEERS SECTION -->
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 lg:col-span-2">
-                             <div class="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-users text-green-600 mr-2"></i> Divisi & Jobdesk</h3>
-                                <button onclick="app.openVolunteerModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded font-bold transition">
-                                    <i class="fas fa-plus mr-1"></i> DIVISI
-                                </button>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                ${volunteers.map(v => {
-                                    const safeV = JSON.stringify(v).replace(/"/g, '&quot;');
-                                    return `
-                                    <div class="border rounded-lg p-3 bg-gray-50 hover-trigger relative">
-                                        <div class="absolute top-2 right-2 hover-target">
-                                            <button onclick="app.openVolunteerModal(${safeV})" class="text-blue-500 hover:text-blue-700 mr-1"><i class="fas fa-pen text-xs"></i></button>
-                                            <button onclick="app.deleteItem('volunteers', '${v.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>
-                                        </div>
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span class="font-bold text-green-800">${v.role_name}</span>
-                                            <span class="bg-white border text-xs px-2 py-1 rounded-full">${v.count} Orang</span>
-                                        </div>
-                                        <p class="text-sm text-gray-600">${v.jobdesk}</p>
-                                    </div>
-                                `}).join('')}
-                                ${volunteers.length === 0 ? '<p class="text-gray-400 italic col-span-2 text-center">Belum ada data relawan.</p>' : ''}
-                            </div>
-                        </div>
-
-                    </div>
-                `;
-                container.innerHTML = html;
-            },
-
-            // --- SEEDER FUNCTION (Hardcoded Bandung Data) ---
+            // --- SEED DATA ---
             generateBandungData: async () => {
-                const conf = confirm("Apakah Anda ingin membuat data 'Bandung Menyapa #3' secara otomatis?");
-                if (!conf) return;
-
-                // 1. Create Project
+                if (!confirm("Buat data dummy 'Bandung Menyapa #3'?")) return;
+                
+                // Ensure bucket table exists for demo (SQL usually needed, but we try insert)
+                // 1. Project
                 const { data: proj, error: pErr } = await supabase.from('projects').insert([{
-                    title: "Bandung Menyapa #3: Painting & Fruit Sharing Day",
+                    title: "Bandung Menyapa #3",
                     regional: "Bandung",
                     theme: "Buah-buahan & Kreativitas",
                     leader: "Shafira",
                     event_date: "2025-12-21",
-                    location: "Jalan Bijaksana Dalam, No. 11, Kota Bandung",
-                    status: "Planning"
+                    location: "Jalan Bijaksana No. 11, Bandung",
+                    status: "Tahap 4: Rekrutmen Delegasi" // Example mid-progress
                 }]).select().single();
 
-                if (pErr) { alert("Gagal buat project: " + pErr.message); return; }
-
+                if (pErr) { alert("Error: " + pErr.message); return; }
                 const pid = proj.id;
 
-                // 2. Create Rundown
-                const rundowns = [
-                    { project_id: pid, time_start: "08.30", time_end: "08.45", activity: "Kumpul delegasi", description: "" },
-                    { project_id: pid, time_start: "08.45", time_end: "09.00", activity: "Briefing singkat", description: "" },
-                    { project_id: pid, time_start: "09.00", time_end: "09.15", activity: "Pembukaan MC", description: "Menyapa, Sambutan Leader & Yayasan, Doa" },
-                    { project_id: pid, time_start: "09.15", time_end: "10.15", activity: "Painting Totebag", description: "Divisi Program + PDD" },
-                    { project_id: pid, time_start: "10.15", time_end: "10.20", activity: "Istirahat", description: "Free time" },
-                    { project_id: pid, time_start: "10.20", time_end: "10.40", activity: "Penukaran Gambar", description: "Divisi Games: Tukar totebag dengan buah asli" },
-                    { project_id: pid, time_start: "10.40", time_end: "11.20", activity: "Edukasi Buah", description: "Divisi Edukasi: Makan buah bersama" },
-                    { project_id: pid, time_start: "11.20", time_end: "11.30", activity: "Penutupan & Dokumentasi", description: "Foto bersama, Video Tagline, Pembagian Konsumsi" },
-                    { project_id: pid, time_start: "11.30", time_end: "12.00", activity: "Evaluasi", description: "Dipimpin Project Leader" }
-                ];
-                await supabase.from('rundowns').insert(rundowns);
+                // 2. Rundown
+                await supabase.from('rundowns').insert([
+                    { project_id: pid, time_start: "08:30", time_end: "09:00", activity: "Briefing & Pembukaan", description: "MC & Leader" },
+                    { project_id: pid, time_start: "09:00", time_end: "10:15", activity: "Painting Totebag", description: "Program Div" },
+                    { project_id: pid, time_start: "10:40", time_end: "11:20", activity: "Edukasi & Makan Buah", description: "All Delegates" }
+                ]);
 
-                // 3. Create Budget
-                const budgets = [
-                    { project_id: pid, item_name: "Paket painting totebag", quantity: "20 pcs", unit_price: 13200, total_price: 264000 },
-                    { project_id: pid, item_name: "Konsumsi (makanan berat)", quantity: "35 packs", unit_price: 10000, total_price: 350000 },
-                    { project_id: pid, item_name: "Air mineral", quantity: "1 dus", unit_price: 25000, total_price: 25000 },
-                    { project_id: pid, item_name: "Bolu untuk delegasi", quantity: "2 dus", unit_price: 25000, total_price: 50000 },
-                    { project_id: pid, item_name: "Buah Pisang", quantity: "1 kg", unit_price: 12000, total_price: 12000 },
-                    { project_id: pid, item_name: "Buah Strawberry", quantity: "1/4 kg", unit_price: 10000, total_price: 10000 },
-                    { project_id: pid, item_name: "Buah Apel", quantity: "1/4 kg", unit_price: 0, total_price: 0 },
-                    { project_id: pid, item_name: "Buah Semangka", quantity: "1/2 kg", unit_price: 0, total_price: 0 },
-                    { project_id: pid, item_name: "Print Gambar Buah", quantity: "15 lembar", unit_price: 500, total_price: 7500 }
-                ];
-                await supabase.from('budgets').insert(budgets);
+                // 3. Files (Simulated)
+                // Note: If table project_files doesn't exist, this will fail silently in UI but show in console.
+                // You must run SQL: CREATE TABLE project_files (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, project_id UUID, filename TEXT, url TEXT); ALTER TABLE project_files ENABLE ROW LEVEL SECURITY; CREATE POLICY "Public" ON project_files FOR ALL USING (true);
+                try {
+                    await supabase.from('project_files').insert([
+                        { project_id: pid, filename: "Proposal Sponsorship.pdf", url: "#" },
+                        { project_id: pid, filename: "RAB Final.xlsx", url: "#" }
+                    ]);
+                } catch(e) { console.log("File table missing?"); }
 
-                // 4. Create Volunteers
-                const volunteers = [
-                    { project_id: pid, role_name: "MC", count: 2, jobdesk: "Memandu jalannya kegiatan" },
-                    { project_id: pid, role_name: "Divisi Edukasi", count: 2, jobdesk: "Menjelaskan pentingnya buah kepada adik-adik" },
-                    { project_id: pid, role_name: "Divisi Games", count: 2, jobdesk: "Menyiapkan stand penukaran buah" },
-                    { project_id: pid, role_name: "Divisi Eco Print", count: 4, jobdesk: "Menyiapkan alat dan bahan, membagikan ke adik-adik" }
-                ];
-                await supabase.from('volunteers').insert(volunteers);
-
-                app.showToast("Data Bandung Menyapa #3 berhasil dibuat!");
+                app.showToast("Data Bandung Berhasil Dibuat!");
                 app.fetchProjects();
                 app.showPage('projects');
             }
         };
 
-        // Initialize App
         app.init();
-
     </script>
 </body>
 </html>
