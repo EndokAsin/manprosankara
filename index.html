@@ -124,7 +124,7 @@
             </div>
             <form id="form-project" class="p-6 space-y-4">
                 <input type="hidden" name="id" id="project-id">
-                <!-- Removed 'step' input as database handles default, handled via status select if edit -->
+                
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nama Kegiatan</label>
                     <input type="text" name="title" id="project-title" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
@@ -164,13 +164,12 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Status Tahapan (SOP)</label>
                     <select name="status" id="project-status" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
-                        <option value="Tahap 1: Pra-Persiapan">1. Pra-Persiapan (Survey)</option>
-                        <option value="Tahap 2: Persetujuan Konsep">2. Persetujuan Konsep (RnD)</option>
-                        <option value="Tahap 3: Media & Administrasi">3. Media & Administrasi</option>
-                        <option value="Tahap 4: Rekrutmen Delegasi">4. Rekrutmen Delegasi</option>
-                        <option value="Tahap 5: First Meet">5. First Meet</option>
-                        <option value="Tahap 6: Pelaksanaan">6. Pelaksanaan (D-Day)</option>
-                        <option value="Tahap 7: Pelaporan Akhir">7. Pelaporan & Evaluasi</option>
+                        <option value="Tahap 1: Submit Proposal">1. Submit Proposal (Max H-18)</option>
+                        <option value="Tahap 2: Media & Finance">2. Media & Finance (Max H-15)</option>
+                        <option value="Tahap 3: Rekrutmen & Pembelian">3. Rekrutmen & Pembelian (H-15 s/d H-5)</option>
+                        <option value="Tahap 4: First Meet">4. First Meet (H-3)</option>
+                        <option value="Tahap 5: Kegiatan">5. Kegiatan (H-0)</option>
+                        <option value="Tahap 6: Laporan">6. Laporan (Max H+2)</option>
                     </select>
                 </div>
                 <div class="pt-2">
@@ -197,14 +196,14 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // --- UPDATED SOP STEPS (6 STEPS) ---
         const SOP_STEPS = [
-            { id: 1, name: "Pra-Persiapan", desc: "Survey" },
-            { id: 2, name: "Persetujuan", desc: "RAB Final" },
-            { id: 3, name: "Media & Admin", desc: "Publikasi" },
-            { id: 4, name: "Rekrutmen", desc: "Oprec" },
-            { id: 5, name: "First Meet", desc: "Koordinasi" },
-            { id: 6, name: "Pelaksanaan", desc: "D-Day" },
-            { id: 7, name: "Pelaporan", desc: "LPJ" }
+            { id: 1, name: "Proposal", desc: "Max H-18" },
+            { id: 2, name: "Media & Fin", desc: "Max H-15" },
+            { id: 3, name: "Rekrutmen", desc: "H-15 s/d H-5" },
+            { id: 4, name: "First Meet", desc: "H-3" },
+            { id: 5, name: "Kegiatan", desc: "H-0" },
+            { id: 6, name: "Laporan", desc: "Max H+2" }
         ];
 
         const app = {
@@ -265,7 +264,7 @@
             // --- RENDER DASHBOARD (MASTER GANTT) ---
             renderDashboard: (container) => {
                 const total = app.projects.length;
-                const completed = app.projects.filter(p => p.status.includes('Tahap 7')).length;
+                const completed = app.projects.filter(p => p.status.includes('Tahap 6')).length;
                 const ongoing = total - completed;
 
                 // Group Projects by Regional
@@ -402,7 +401,7 @@
                                         <tbody class="divide-y divide-slate-50">
                                             ${projects.map(p => {
                                                 const stepNum = parseInt((p.status||'').split(':')[0].replace('Tahap ','') || 1);
-                                                const pct = (stepNum/7)*100;
+                                                const pct = (stepNum/6)*100; // Updated division by 6
                                                 return `
                                                 <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="app.getProjectDetails('${p.id}')">
                                                     <td class="p-4 font-medium text-slate-800">${p.title}<div class="text-xs text-slate-400 font-normal md:hidden">${p.leader}</div></td>
@@ -412,7 +411,7 @@
                                                         <div class="w-full bg-slate-100 rounded-full h-1.5">
                                                             <div class="bg-green-500 h-1.5 rounded-full" style="width: ${pct}%"></div>
                                                         </div>
-                                                        <div class="text-[10px] text-center text-slate-400 mt-1">Tahap ${stepNum}/7</div>
+                                                        <div class="text-[10px] text-center text-slate-400 mt-1">Tahap ${stepNum}/6</div>
                                                     </td>
                                                     <td class="p-4 text-right">
                                                         <button onclick="event.stopPropagation(); app.deleteItem('projects', '${p.id}')" class="text-slate-300 hover:text-red-500 p-2"><i class="fas fa-trash"></i></button>
@@ -463,6 +462,7 @@
                                 <div class="flex flex-col items-center relative flex-1 min-w-[80px]">
                                     <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-2 border-2 ${step.id <= currentStep ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-200 text-slate-300'}">${step.id}</div>
                                     <div class="text-[10px] font-bold text-center ${step.id <= currentStep ? 'text-slate-800' : 'text-slate-400'}">${step.name}</div>
+                                    <div class="text-[9px] text-slate-400 text-center">${step.desc}</div>
                                     ${idx !== SOP_STEPS.length - 1 ? `<div class="absolute top-4 left-[50%] w-full h-[2px] -z-10 ${step.id < currentStep ? 'bg-green-500' : 'bg-slate-200'}"></div>` : ''}
                                 </div>
                             `).join('')}
@@ -520,16 +520,18 @@
             // --- GANTT RENDERER HELPER ---
             renderGanttChart: (eventDateStr) => {
                 if(!eventDateStr) return '<div class="text-center text-slate-400 text-sm py-4">Tentukan tanggal acara untuk melihat timeline</div>';
+                
+                // UPDATED TIMELINE BASED ON USER REQUEST
                 const timeline = [
-                    { name: "Pra-Persiapan (Survey)", startDaysBefore: 45, duration: 7, color: "bg-purple-400" },
-                    { name: "Persetujuan Konsep & RAB", startDaysBefore: 38, duration: 5, color: "bg-blue-400" },
-                    { name: "Media & Pencairan Dana", startDaysBefore: 33, duration: 7, color: "bg-cyan-400" },
-                    { name: "Open Recruitment", startDaysBefore: 26, duration: 10, color: "bg-teal-400" },
-                    { name: "Briefing & First Meet", startDaysBefore: 14, duration: 1, color: "bg-yellow-400" },
-                    { name: "Technical Meeting", startDaysBefore: 3, duration: 1, color: "bg-orange-400" },
-                    { name: "ACARA (D-DAY)", startDaysBefore: 0, duration: 1, color: "bg-green-500" },
-                    { name: "Pelaporan Akhir", startDaysBefore: -2, duration: 5, color: "bg-slate-400" } 
+                    { name: "Submit Proposal (Max H-18)", startDaysBefore: 25, duration: 7, color: "bg-purple-400" }, // Est. 1 week prep
+                    { name: "Media & Finance (Max H-15)", startDaysBefore: 18, duration: 3, color: "bg-blue-400" },
+                    { name: "Rekrutmen (H-15 s/d H-5)", startDaysBefore: 15, duration: 10, color: "bg-teal-400" },
+                    { name: "Pembelian (H-15 s/d Meet)", startDaysBefore: 15, duration: 12, color: "bg-yellow-400" }, // H-15 to H-3
+                    { name: "First Meet (H-3)", startDaysBefore: 3, duration: 1, color: "bg-orange-400" },
+                    { name: "Kegiatan (H-0)", startDaysBefore: 0, duration: 1, color: "bg-green-500" },
+                    { name: "Laporan (Max H+2)", startDaysBefore: -1, duration: 2, color: "bg-slate-400" } 
                 ];
+
                 let html = `<div class="w-full text-xs"><div class="grid grid-cols-6 gap-1 mb-2 text-slate-400 font-bold border-b pb-2 text-center"><div>W-6</div><div>W-5</div><div>W-4</div><div>W-3</div><div>W-2</div><div>W-1</div></div>`;
                 timeline.forEach(item => {
                     const viewSpan = 50; const startPos = 45 - item.startDaysBefore; 
@@ -552,7 +554,7 @@
                 const f = document.getElementById('form-project'); f.reset();
                 if(p) { 
                     ['id','title','regional','leader','theme','event_date','location'].forEach(k => document.getElementById('project-'+k).value = p[k]);
-                    document.getElementById('project-status').value = p.status || 'Tahap 1: Pra-Persiapan';
+                    document.getElementById('project-status').value = p.status || 'Tahap 1: Submit Proposal';
                     document.getElementById('modal-project-title').innerText = "Edit Proyek";
                 } else { document.getElementById('project-id').value = ""; document.getElementById('modal-project-title').innerText = "Proyek Baru"; }
                 app.toggleModal('modal-project');
@@ -567,7 +569,7 @@
             formatDate: (s) => s ? new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '-',
             generateBandungData: async () => {
                 if(!confirm("Generate data?")) return;
-                const { data: p } = await supabase.from('projects').insert([{title:"Bandung Menyapa #3",regional:"Bandung",theme:"Charity",leader:"Shafira",event_date:"2025-12-21",location:"Bandung",status:"Tahap 4: Rekrutmen Delegasi"}]).select().single();
+                const { data: p } = await supabase.from('projects').insert([{title:"Bandung Menyapa #3",regional:"Bandung",theme:"Charity",leader:"Shafira",event_date:"2025-12-21",location:"Bandung",status:"Tahap 3: Rekrutmen & Pembelian"}]).select().single();
                 if(p) {
                      await supabase.from('rundowns').insert([{project_id:p.id,time_start:"08:00",time_end:"09:00",activity:"Opening"}]);
                      await supabase.from('budgets').insert([{project_id:p.id,item_name:"Konsumsi",quantity:"50",unit_price:20000,total_price:1000000}]);
