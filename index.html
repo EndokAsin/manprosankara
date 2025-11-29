@@ -196,14 +196,14 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- UPDATED SOP STEPS (6 STEPS) ---
+        // --- UPDATED SOP STEPS (6 STEPS with Full Status Values) ---
         const SOP_STEPS = [
-            { id: 1, name: "Proposal", desc: "Max H-18" },
-            { id: 2, name: "Media & Fin", desc: "Max H-15" },
-            { id: 3, name: "Rekrutmen", desc: "H-15 s/d H-5" },
-            { id: 4, name: "First Meet", desc: "H-3" },
-            { id: 5, name: "Kegiatan", desc: "H-0" },
-            { id: 6, name: "Laporan", desc: "Max H+2" }
+            { id: 1, name: "Proposal", desc: "Max H-18", fullStatus: "Tahap 1: Submit Proposal" },
+            { id: 2, name: "Media & Fin", desc: "Max H-15", fullStatus: "Tahap 2: Media & Finance" },
+            { id: 3, name: "Rekrutmen", desc: "H-15 s/d H-5", fullStatus: "Tahap 3: Rekrutmen & Pembelian" },
+            { id: 4, name: "First Meet", desc: "H-3", fullStatus: "Tahap 4: First Meet" },
+            { id: 5, name: "Kegiatan", desc: "H-0", fullStatus: "Tahap 5: Kegiatan" },
+            { id: 6, name: "Laporan", desc: "Max H+2", fullStatus: "Tahap 6: Laporan" }
         ];
 
         const app = {
@@ -259,6 +259,17 @@
 
                 if (!proj.data) { app.showToast("Error loading project"); return; }
                 app.renderProjectDetailView(proj.data, rundowns.data || [], budgets.data || [], volunteers.data || [], files.data || []);
+            },
+
+            // --- DIRECT STATUS UPDATE ---
+            updateProjectStatus: async (id, status) => {
+                if(!confirm(`Ubah status proyek menjadi "${status}"?`)) return;
+                const { error } = await supabase.from('projects').update({ status: status }).eq('id', id);
+                if(error) app.showToast("Gagal update status: " + error.message);
+                else {
+                    app.showToast("Status diperbarui!");
+                    app.getProjectDetails(id);
+                }
             },
 
             // --- RENDER DASHBOARD (MASTER GANTT) ---
@@ -456,11 +467,11 @@
                             <div class="text-right"><div class="text-xl font-bold text-slate-800">${app.formatDate(project.event_date)}</div><div class="text-xs text-slate-500">${project.location}</div></div>
                         </div>
 
-                        <!-- Stepper -->
+                        <!-- Stepper (Interactive) -->
                         <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between w-full overflow-x-auto pb-2">
                             ${SOP_STEPS.map((step, idx) => `
-                                <div class="flex flex-col items-center relative flex-1 min-w-[80px]">
-                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-2 border-2 ${step.id <= currentStep ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-200 text-slate-300'}">${step.id}</div>
+                                <div class="flex flex-col items-center relative flex-1 min-w-[80px] group cursor-pointer" onclick="app.updateProjectStatus('${project.id}', '${step.fullStatus}')" title="Klik untuk ubah ke tahap ini">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-2 border-2 transition-all group-hover:scale-110 ${step.id <= currentStep ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-200 text-slate-300 group-hover:border-green-300'}">${step.id}</div>
                                     <div class="text-[10px] font-bold text-center ${step.id <= currentStep ? 'text-slate-800' : 'text-slate-400'}">${step.name}</div>
                                     <div class="text-[9px] text-slate-400 text-center">${step.desc}</div>
                                     ${idx !== SOP_STEPS.length - 1 ? `<div class="absolute top-4 left-[50%] w-full h-[2px] -z-10 ${step.id < currentStep ? 'bg-green-500' : 'bg-slate-200'}"></div>` : ''}
