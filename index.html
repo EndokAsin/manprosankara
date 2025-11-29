@@ -24,6 +24,10 @@
         /* Hide scrollbar for clean UI */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Interactive Elements */
+        .hover-trigger .hover-target { visibility: hidden; opacity: 0; transition: opacity 0.2s; }
+        .hover-trigger:hover .hover-target { visibility: visible; opacity: 1; }
     </style>
 </head>
 <body class="text-gray-800">
@@ -86,23 +90,25 @@
         </main>
     </div>
 
-    <!-- Modals -->
-    <!-- Add Project Modal -->
+    <!-- MODALS -->
+
+    <!-- Modal Project (Create/Edit) -->
     <div id="modal-project" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
-                <h3 class="font-bold text-lg">Buah Proyek Baru</h3>
+                <h3 class="font-bold text-lg" id="modal-project-title">Proyek Baru</h3>
                 <button onclick="app.toggleModal('modal-project')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
             </div>
             <form id="form-project" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="project-id">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nama Kegiatan</label>
-                    <input type="text" name="title" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    <input type="text" name="title" id="project-title" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Regional</label>
-                        <select name="regional" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <select name="regional" id="project-regional" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
                             <option value="Bandung">Bandung</option>
                             <option value="Jakarta">Jakarta</option>
                             <option value="Surabaya">Surabaya</option>
@@ -111,27 +117,132 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Project Leader</label>
-                        <input type="text" name="leader" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <input type="text" name="leader" id="project-leader" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
                     </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tema</label>
-                    <input type="text" name="theme" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    <input type="text" name="theme" id="project-theme" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
-                        <input type="date" name="event_date" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <input type="date" name="event_date" id="project-date" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
-                        <input type="text" name="location" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <input type="text" name="location" id="project-location" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select name="status" id="project-status" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                        <option value="Planning">Planning</option>
+                        <option value="Ongoing">Ongoing</option>
+                        <option value="Completed">Completed</option>
+                    </select>
                 </div>
                 <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition">Simpan Proyek</button>
             </form>
         </div>
     </div>
+
+    <!-- Modal Rundown -->
+    <div id="modal-rundown" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg" id="modal-rundown-title">Item Rundown</h3>
+                <button onclick="app.toggleModal('modal-rundown')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form-rundown" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="rundown-id">
+                <input type="hidden" name="project_id" id="rundown-project-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Mulai</label>
+                        <input type="text" name="time_start" id="rundown-start" placeholder="08:00" class="w-full border rounded px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Selesai</label>
+                        <input type="text" name="time_end" id="rundown-end" placeholder="09:00" class="w-full border rounded px-3 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Kegiatan</label>
+                    <input type="text" name="activity" id="rundown-activity" required class="w-full border rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Keterangan/PIC</label>
+                    <textarea name="description" id="rundown-desc" rows="2" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan Rundown</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Budget -->
+    <div id="modal-budget" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg" id="modal-budget-title">Item Budget</h3>
+                <button onclick="app.toggleModal('modal-budget')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form-budget" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="budget-id">
+                <input type="hidden" name="project_id" id="budget-project-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Barang</label>
+                    <input type="text" name="item_name" id="budget-item" required class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Jumlah (Qty)</label>
+                        <input type="text" name="quantity" id="budget-qty" placeholder="Misal: 10 Pcs" class="w-full border rounded px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Harga Satuan</label>
+                        <input type="number" name="unit_price" id="budget-price" class="w-full border rounded px-3 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Total Harga</label>
+                    <input type="number" name="total_price" id="budget-total" class="w-full border rounded px-3 py-2 bg-gray-50">
+                    <p class="text-xs text-gray-400 mt-1">*Otomatis dihitung jika unit & qty (angka) diisi.</p>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan Budget</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Volunteer -->
+    <div id="modal-volunteer" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg" id="modal-volunteer-title">Divisi Volunteer</h3>
+                <button onclick="app.toggleModal('modal-volunteer')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form-volunteer" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="volunteer-id">
+                <input type="hidden" name="project_id" id="volunteer-project-id">
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nama Divisi</label>
+                        <input type="text" name="role_name" id="volunteer-role" required class="w-full border rounded px-3 py-2">
+                    </div>
+                    <div class="w-24">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
+                        <input type="number" name="count" id="volunteer-count" class="w-full border rounded px-3 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Jobdesk</label>
+                    <textarea name="jobdesk" id="volunteer-jobdesk" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan Divisi</button>
+            </form>
+        </div>
+    </div>
+
 
     <script>
         // --- KONFIGURASI SUPABASE ---
@@ -144,20 +255,177 @@
         // --- APP STATE ---
         const app = {
             currentPage: 'projects',
-            currentProject: null,
+            activeProjectId: null, // Stores current project ID being viewed
             projects: [],
             
             init: async () => {
                 await app.fetchProjects();
                 app.showPage('projects');
                 
-                // Event Listener for Project Form
+                // --- FORM LISTENERS ---
+
+                // Project Form
                 document.getElementById('form-project').addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    const formData = new FormData(e.target);
-                    const data = Object.fromEntries(formData.entries());
-                    await app.createProject(data);
+                    await app.handleFormSubmit(e.target, 'projects', app.fetchProjects);
                 });
+
+                // Rundown Form
+                document.getElementById('form-rundown').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'rundowns', () => app.getProjectDetails(app.activeProjectId));
+                });
+
+                // Budget Form
+                document.getElementById('form-budget').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'budgets', () => app.getProjectDetails(app.activeProjectId));
+                });
+                
+                // Auto-calc budget
+                const bQty = document.getElementById('budget-qty');
+                const bPrice = document.getElementById('budget-price');
+                const calc = () => {
+                    const q = parseFloat(bQty.value) || 0;
+                    const p = parseFloat(bPrice.value) || 0;
+                    if(q && p) document.getElementById('budget-total').value = q * p;
+                };
+                bQty.addEventListener('input', calc);
+                bPrice.addEventListener('input', calc);
+
+
+                // Volunteer Form
+                document.getElementById('form-volunteer').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'volunteers', () => app.getProjectDetails(app.activeProjectId));
+                });
+            },
+
+            // --- GENERIC FORM HANDLER ---
+            handleFormSubmit: async (form, tableName, refreshCallback) => {
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                const id = data.id; // Check if update or insert
+                delete data.id; // Remove ID from payload for update/insert logic if needed, but Supabase upsert needs ID usually or separate logic
+                
+                let error;
+
+                if (id) {
+                    // Update
+                    const { error: err } = await supabase.from(tableName).update(data).eq('id', id);
+                    error = err;
+                    app.showToast(error ? "Gagal update data" : "Data berhasil diperbarui!");
+                } else {
+                    // Insert
+                    const { error: err } = await supabase.from(tableName).insert([data]);
+                    error = err;
+                    app.showToast(error ? "Gagal simpan data" : "Data berhasil disimpan!");
+                }
+
+                if (!error) {
+                    // Close relevant modal
+                    if(tableName === 'projects') app.toggleModal('modal-project');
+                    else if(tableName === 'rundowns') app.toggleModal('modal-rundown');
+                    else if(tableName === 'budgets') app.toggleModal('modal-budget');
+                    else if(tableName === 'volunteers') app.toggleModal('modal-volunteer');
+                    
+                    form.reset();
+                    if(refreshCallback) await refreshCallback();
+                    // If we updated project, refresh current view if we are inside it
+                    if(tableName === 'projects' && app.currentPage === 'detail' && app.activeProjectId) {
+                        await app.getProjectDetails(app.activeProjectId);
+                    }
+                }
+            },
+
+            // --- GENERIC DELETE HANDLER ---
+            deleteItem: async (table, id) => {
+                if(!confirm("Yakin ingin menghapus item ini?")) return;
+                
+                const { error } = await supabase.from(table).delete().eq('id', id);
+                if (error) {
+                    app.showToast("Gagal menghapus data.");
+                } else {
+                    app.showToast("Data dihapus.");
+                    if(table === 'projects') {
+                        await app.fetchProjects();
+                        app.showPage('projects');
+                    } else {
+                        await app.getProjectDetails(app.activeProjectId);
+                    }
+                }
+            },
+
+            // --- MODAL HELPERS ---
+            
+            openProjectModal: (project = null) => {
+                const form = document.getElementById('form-project');
+                form.reset();
+                if (project) {
+                    document.getElementById('modal-project-title').innerText = "Edit Proyek";
+                    document.getElementById('project-id').value = project.id;
+                    document.getElementById('project-title').value = project.title;
+                    document.getElementById('project-regional').value = project.regional;
+                    document.getElementById('project-leader').value = project.leader;
+                    document.getElementById('project-theme').value = project.theme;
+                    document.getElementById('project-date').value = project.event_date;
+                    document.getElementById('project-location').value = project.location;
+                    document.getElementById('project-status').value = project.status || 'Planning';
+                } else {
+                    document.getElementById('modal-project-title').innerText = "Buat Proyek Baru";
+                    document.getElementById('project-id').value = "";
+                }
+                app.toggleModal('modal-project');
+            },
+
+            openRundownModal: (item = null) => {
+                document.getElementById('form-rundown').reset();
+                document.getElementById('rundown-project-id').value = app.activeProjectId;
+                if(item) {
+                    document.getElementById('rundown-id').value = item.id;
+                    document.getElementById('rundown-start').value = item.time_start;
+                    document.getElementById('rundown-end').value = item.time_end;
+                    document.getElementById('rundown-activity').value = item.activity;
+                    document.getElementById('rundown-desc').value = item.description;
+                    document.getElementById('modal-rundown-title').innerText = "Edit Rundown";
+                } else {
+                    document.getElementById('rundown-id').value = "";
+                    document.getElementById('modal-rundown-title').innerText = "Tambah Rundown";
+                }
+                app.toggleModal('modal-rundown');
+            },
+
+            openBudgetModal: (item = null) => {
+                document.getElementById('form-budget').reset();
+                document.getElementById('budget-project-id').value = app.activeProjectId;
+                if(item) {
+                    document.getElementById('budget-id').value = item.id;
+                    document.getElementById('budget-item').value = item.item_name;
+                    document.getElementById('budget-qty').value = item.quantity;
+                    document.getElementById('budget-price').value = item.unit_price;
+                    document.getElementById('budget-total').value = item.total_price;
+                    document.getElementById('modal-budget-title').innerText = "Edit Budget";
+                } else {
+                    document.getElementById('budget-id').value = "";
+                    document.getElementById('modal-budget-title').innerText = "Tambah Budget";
+                }
+                app.toggleModal('modal-budget');
+            },
+
+            openVolunteerModal: (item = null) => {
+                document.getElementById('form-volunteer').reset();
+                document.getElementById('volunteer-project-id').value = app.activeProjectId;
+                if(item) {
+                    document.getElementById('volunteer-id').value = item.id;
+                    document.getElementById('volunteer-role').value = item.role_name;
+                    document.getElementById('volunteer-count').value = item.count;
+                    document.getElementById('volunteer-jobdesk').value = item.jobdesk;
+                    document.getElementById('modal-volunteer-title').innerText = "Edit Divisi";
+                } else {
+                    document.getElementById('volunteer-id').value = "";
+                    document.getElementById('modal-volunteer-title').innerText = "Tambah Divisi";
+                }
+                app.toggleModal('modal-volunteer');
             },
 
             // --- NAVIGATION & UI ---
@@ -166,7 +434,7 @@
                 const container = document.getElementById('content-area');
                 
                 if (pageName === 'dashboard') {
-                    // Simple dashboard stats
+                    app.activeProjectId = null;
                     const totalProjects = app.projects.length;
                     const upcoming = app.projects.filter(p => new Date(p.event_date) > new Date()).length;
                     
@@ -184,6 +452,7 @@
                         </div>
                     `;
                 } else if (pageName === 'projects') {
+                    app.activeProjectId = null;
                     app.renderProjectList(container);
                 }
             },
@@ -228,20 +497,10 @@
                 }
             },
 
-            createProject: async (projectData) => {
-                const { data, error } = await supabase.from('projects').insert([projectData]).select();
-                if (error) {
-                    app.showToast("Error creating project");
-                } else {
-                    app.showToast("Proyek berhasil dibuat!");
-                    app.toggleModal('modal-project');
-                    document.getElementById('form-project').reset();
-                    await app.fetchProjects();
-                    app.showPage('projects');
-                }
-            },
-
             getProjectDetails: async (id) => {
+                app.activeProjectId = id;
+                app.currentPage = 'detail';
+                
                 // Fetch basic info, rundown, budget, volunteers concurrently
                 const [proj, rundowns, budgets, volunteers] = await Promise.all([
                     supabase.from('projects').select('*').eq('id', id).single(),
@@ -264,7 +523,7 @@
                 let html = `
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Daftar Proyek Sankara</h2>
-                        <button onclick="app.toggleModal('modal-project')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                        <button onclick="app.openProjectModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
                             <i class="fas fa-plus mr-2"></i> Buat Proyek
                         </button>
                     </div>
@@ -276,7 +535,10 @@
                 } else {
                     app.projects.forEach(p => {
                         html += `
-                            <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition p-5 cursor-pointer" onclick="app.getProjectDetails('${p.id}')">
+                            <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition p-5 cursor-pointer relative group" onclick="app.getProjectDetails('${p.id}')">
+                                <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
+                                    <button onclick="event.stopPropagation(); app.deleteItem('projects', '${p.id}')" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-trash"></i></button>
+                                </div>
                                 <div class="flex justify-between items-start mb-3">
                                     <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded uppercase tracking-wide">${p.regional || 'Umum'}</span>
                                     <span class="text-xs text-gray-400"><i class="far fa-calendar-alt mr-1"></i> ${p.event_date || '-'}</span>
@@ -304,19 +566,31 @@
                 
                 // Calculate Total Budget
                 const totalBudget = budgets.reduce((sum, item) => sum + (item.total_price || 0), 0);
+                
+                // Safe JSON for onclick handlers
+                const safeProj = JSON.stringify(project).replace(/"/g, '&quot;');
 
                 const html = `
-                    <button onclick="app.showPage('projects')" class="mb-4 text-sm text-gray-500 hover:text-green-600"><i class="fas fa-arrow-left"></i> Kembali ke Daftar</button>
+                    <div class="flex justify-between items-center mb-4">
+                        <button onclick="app.showPage('projects')" class="text-sm text-gray-500 hover:text-green-600"><i class="fas fa-arrow-left"></i> Kembali ke Daftar</button>
+                    </div>
                     
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-                        <div class="bg-green-600 p-6 text-white">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 relative group">
+                        <!-- Edit Project Button -->
+                        <div class="absolute top-4 right-4 z-10">
+                            <button onclick="app.openProjectModal(${safeProj})" class="bg-white bg-opacity-20 hover:bg-opacity-100 hover:text-green-700 text-white p-2 rounded-full transition backdrop-blur-sm">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                        </div>
+
+                        <div class="bg-green-600 p-6 text-white relative">
                             <div class="flex justify-between items-start">
                                 <div>
                                     <span class="bg-green-700 bg-opacity-50 text-white text-xs px-2 py-1 rounded mb-2 inline-block">${project.regional}</span>
                                     <h1 class="text-3xl font-bold">${project.title}</h1>
                                     <p class="opacity-90 mt-1">${project.theme}</p>
                                 </div>
-                                <div class="text-right">
+                                <div class="text-right mt-8 md:mt-0">
                                     <div class="text-2xl font-bold">${app.formatDate(project.event_date)}</div>
                                     <div class="text-sm opacity-75"><i class="fas fa-map-marker-alt mr-1"></i> ${project.location}</div>
                                 </div>
@@ -339,29 +613,47 @@
                     </div>
 
                     <!-- Tabs/Sections -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
                         
                         <!-- RUNDOWN SECTION -->
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="far fa-clock text-green-600 mr-2"></i> Rundown Kegiatan</h3>
-                            <div class="space-y-4">
-                                ${rundowns.map(r => `
-                                    <div class="flex">
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-full flex flex-col">
+                            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                                <h3 class="text-lg font-bold text-gray-800"><i class="far fa-clock text-green-600 mr-2"></i> Rundown</h3>
+                                <button onclick="app.openRundownModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded font-bold transition">
+                                    <i class="fas fa-plus mr-1"></i> ITEM
+                                </button>
+                            </div>
+                            <div class="space-y-4 flex-1">
+                                ${rundowns.map(r => {
+                                    const safeR = JSON.stringify(r).replace(/"/g, '&quot;');
+                                    return `
+                                    <div class="flex hover-trigger group">
                                         <div class="w-24 flex-shrink-0 text-sm font-bold text-gray-600">${r.time_start}</div>
                                         <div class="flex-1 pb-4 border-l-2 border-green-200 pl-4 relative">
                                             <div class="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-green-500"></div>
-                                            <div class="font-bold text-gray-800">${r.activity}</div>
+                                            <div class="flex justify-between">
+                                                <div class="font-bold text-gray-800">${r.activity}</div>
+                                                <div class="hover-target">
+                                                    <button onclick="app.openRundownModal(${safeR})" class="text-blue-500 hover:text-blue-700 mr-2"><i class="fas fa-pen text-xs"></i></button>
+                                                    <button onclick="app.deleteItem('rundowns', '${r.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>
+                                                </div>
+                                            </div>
                                             <div class="text-sm text-gray-500 mt-1">${r.description || ''}</div>
                                         </div>
                                     </div>
-                                `).join('')}
-                                ${rundowns.length === 0 ? '<p class="text-gray-400 italic">Belum ada rundown.</p>' : ''}
+                                `}).join('')}
+                                ${rundowns.length === 0 ? '<p class="text-gray-400 italic text-center py-4">Belum ada rundown.</p>' : ''}
                             </div>
                         </div>
 
                         <!-- BUDGET SECTION -->
-                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fas fa-coins text-green-600 mr-2"></i> Estimasi Biaya</h3>
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-full flex flex-col">
+                            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                                <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-coins text-green-600 mr-2"></i> Budget</h3>
+                                <button onclick="app.openBudgetModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded font-bold transition">
+                                    <i class="fas fa-plus mr-1"></i> ITEM
+                                </button>
+                            </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm text-left">
                                     <thead class="bg-gray-50 text-gray-600 font-bold">
@@ -370,22 +662,30 @@
                                             <th class="p-2 text-center">Jml</th>
                                             <th class="p-2 text-right">Harga</th>
                                             <th class="p-2 text-right">Total</th>
+                                            <th class="p-2 w-10"></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y">
-                                        ${budgets.map(b => `
-                                            <tr>
+                                        ${budgets.map(b => {
+                                            const safeB = JSON.stringify(b).replace(/"/g, '&quot;');
+                                            return `
+                                            <tr class="hover:bg-gray-50 hover-trigger group">
                                                 <td class="p-2 font-medium">${b.item_name}</td>
                                                 <td class="p-2 text-center">${b.quantity}</td>
-                                                <td class="p-2 text-right text-gray-500">${b.unit_price > 0 ? (b.unit_price/1000).toFixed(0) + 'k' : '-'}</td>
+                                                <td class="p-2 text-right text-gray-500 text-xs">${b.unit_price > 0 ? (b.unit_price/1000).toFixed(0) + 'k' : '-'}</td>
                                                 <td class="p-2 text-right font-bold">${b.total_price > 0 ? app.formatCurrency(b.total_price) : '-'}</td>
+                                                <td class="p-2 text-right hover-target">
+                                                    <button onclick="app.openBudgetModal(${safeB})" class="text-blue-500 mr-2"><i class="fas fa-pen text-xs"></i></button>
+                                                    <button onclick="app.deleteItem('budgets', '${b.id}')" class="text-red-400"><i class="fas fa-trash text-xs"></i></button>
+                                                </td>
                                             </tr>
-                                        `).join('')}
+                                        `}).join('')}
                                     </tbody>
                                     <tfoot class="border-t-2 border-gray-200">
                                         <tr>
                                             <td colspan="3" class="p-2 text-right font-bold">TOTAL</td>
                                             <td class="p-2 text-right font-bold text-green-700">${app.formatCurrency(totalBudget)}</td>
+                                            <td></td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -394,17 +694,29 @@
 
                         <!-- VOLUNTEERS SECTION -->
                         <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 lg:col-span-2">
-                            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fas fa-users text-green-600 mr-2"></i> Divisi & Jobdesk</h3>
+                             <div class="flex justify-between items-center mb-4 border-b pb-2">
+                                <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-users text-green-600 mr-2"></i> Divisi & Jobdesk</h3>
+                                <button onclick="app.openVolunteerModal()" class="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded font-bold transition">
+                                    <i class="fas fa-plus mr-1"></i> DIVISI
+                                </button>
+                            </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                ${volunteers.map(v => `
-                                    <div class="border rounded-lg p-3 bg-gray-50">
+                                ${volunteers.map(v => {
+                                    const safeV = JSON.stringify(v).replace(/"/g, '&quot;');
+                                    return `
+                                    <div class="border rounded-lg p-3 bg-gray-50 hover-trigger relative">
+                                        <div class="absolute top-2 right-2 hover-target">
+                                            <button onclick="app.openVolunteerModal(${safeV})" class="text-blue-500 hover:text-blue-700 mr-1"><i class="fas fa-pen text-xs"></i></button>
+                                            <button onclick="app.deleteItem('volunteers', '${v.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>
+                                        </div>
                                         <div class="flex justify-between items-center mb-2">
                                             <span class="font-bold text-green-800">${v.role_name}</span>
                                             <span class="bg-white border text-xs px-2 py-1 rounded-full">${v.count} Orang</span>
                                         </div>
                                         <p class="text-sm text-gray-600">${v.jobdesk}</p>
                                     </div>
-                                `).join('')}
+                                `}).join('')}
+                                ${volunteers.length === 0 ? '<p class="text-gray-400 italic col-span-2 text-center">Belum ada data relawan.</p>' : ''}
                             </div>
                         </div>
 
