@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sankara NGO Project Management</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f4f6; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .loading-spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%;
+            width: 30px; height: 30px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Hide scrollbar for clean UI */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform transition-transform translate-x-full duration-300">
+        <div class="bg-white border-l-4 border-green-500 rounded shadow-lg p-4 flex items-center">
+            <i class="fas fa-check-circle text-green-500 mr-3"></i>
+            <span id="toast-msg">Notification</span>
+        </div>
+    </div>
+
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r hidden md:flex flex-col z-10">
+            <div class="p-6 flex items-center border-b">
+                <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3">S</div>
+                <h1 class="text-xl font-bold tracking-tight text-green-900">SANKARA</h1>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-4">
+                <ul class="space-y-1 px-3">
+                    <li>
+                        <button onclick="app.showPage('dashboard')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-green-50 text-gray-600 hover:text-green-700 font-medium transition flex items-center">
+                            <i class="fas fa-home w-6"></i> Dashboard
+                        </button>
+                    </li>
+                    <li>
+                        <button onclick="app.showPage('projects')" class="w-full text-left px-4 py-3 rounded-lg bg-green-50 text-green-700 font-medium transition flex items-center">
+                            <i class="fas fa-project-diagram w-6"></i> Proyek
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+            <div class="p-4 border-t">
+                <button onclick="app.generateBandungData()" class="w-full bg-green-100 text-green-800 text-xs py-2 px-3 rounded hover:bg-green-200 transition">
+                    <i class="fas fa-database mr-1"></i> Generate "Bandung Menyapa"
+                </button>
+                <div class="mt-2 text-xs text-gray-400 text-center">Connected to Supabase</div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+            
+            <!-- Mobile Header -->
+            <header class="md:hidden bg-white border-b p-4 flex justify-between items-center">
+                <div class="font-bold text-green-700">SANKARA</div>
+                <button class="text-gray-600"><i class="fas fa-bars"></i></button>
+            </header>
+
+            <!-- Content Area -->
+            <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8">
+                <!-- Dynamic Content Loaded Here -->
+                <div class="flex justify-center items-center h-full">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add Project Modal -->
+    <div id="modal-project" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="bg-green-600 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg">Buah Proyek Baru</h3>
+                <button onclick="app.toggleModal('modal-project')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="form-project" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Kegiatan</label>
+                    <input type="text" name="title" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Regional</label>
+                        <select name="regional" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                            <option value="Bandung">Bandung</option>
+                            <option value="Jakarta">Jakarta</option>
+                            <option value="Surabaya">Surabaya</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Project Leader</label>
+                        <input type="text" name="leader" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tema</label>
+                    <input type="text" name="theme" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                        <input type="date" name="event_date" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
+                        <input type="text" name="location" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition">Simpan Proyek</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI SUPABASE ---
+        // Sesuai input user
+        const SUPABASE_URL = 'https://ruehfvjwdasqpzmroaau.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- APP STATE ---
+        const app = {
+            currentPage: 'projects',
+            currentProject: null,
+            projects: [],
+            
+            init: async () => {
+                await app.fetchProjects();
+                app.showPage('projects');
+                
+                // Event Listener for Project Form
+                document.getElementById('form-project').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const data = Object.fromEntries(formData.entries());
+                    await app.createProject(data);
+                });
+            },
+
+            // --- NAVIGATION & UI ---
+            showPage: (pageName) => {
+                app.currentPage = pageName;
+                const container = document.getElementById('content-area');
+                
+                if (pageName === 'dashboard') {
+                    // Simple dashboard stats
+                    const totalProjects = app.projects.length;
+                    const upcoming = app.projects.filter(p => new Date(p.event_date) > new Date()).length;
+                    
+                    container.innerHTML = `
+                        <h2 class="text-2xl font-bold mb-6 text-gray-800">Dashboard Overview</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
+                                <div class="text-gray-500 text-sm">Total Proyek</div>
+                                <div class="text-3xl font-bold text-gray-800">${totalProjects}</div>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+                                <div class="text-gray-500 text-sm">Akan Datang</div>
+                                <div class="text-3xl font-bold text-gray-800">${upcoming}</div>
+                            </div>
+                        </div>
+                    `;
+                } else if (pageName === 'projects') {
+                    app.renderProjectList(container);
+                }
+            },
+
+            toggleModal: (id) => {
+                const modal = document.getElementById(id);
+                if (modal.classList.contains('hidden')) {
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            },
+
+            showToast: (msg) => {
+                const toast = document.getElementById('toast');
+                document.getElementById('toast-msg').innerText = msg;
+                toast.classList.remove('translate-x-full');
+                setTimeout(() => {
+                    toast.classList.add('translate-x-full');
+                }, 3000);
+            },
+
+            formatCurrency: (num) => {
+                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num);
+            },
+
+            formatDate: (dateString) => {
+                if(!dateString) return '-';
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                return new Date(dateString).toLocaleDateString('id-ID', options);
+            },
+
+            // --- DATA FUNCTIONS ---
+
+            fetchProjects: async () => {
+                const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+                if (error) {
+                    console.error("Error fetching projects:", error);
+                    app.showToast("Gagal mengambil data proyek. Cek console.");
+                } else {
+                    app.projects = data;
+                }
+            },
+
+            createProject: async (projectData) => {
+                const { data, error } = await supabase.from('projects').insert([projectData]).select();
+                if (error) {
+                    app.showToast("Error creating project");
+                } else {
+                    app.showToast("Proyek berhasil dibuat!");
+                    app.toggleModal('modal-project');
+                    document.getElementById('form-project').reset();
+                    await app.fetchProjects();
+                    app.showPage('projects');
+                }
+            },
+
+            getProjectDetails: async (id) => {
+                // Fetch basic info, rundown, budget, volunteers concurrently
+                const [proj, rundowns, budgets, volunteers] = await Promise.all([
+                    supabase.from('projects').select('*').eq('id', id).single(),
+                    supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', {ascending: true}),
+                    supabase.from('budgets').select('*').eq('project_id', id),
+                    supabase.from('volunteers').select('*').eq('project_id', id)
+                ]);
+
+                if (proj.error) {
+                    app.showToast("Error loading details");
+                    return;
+                }
+
+                app.renderProjectDetailView(proj.data, rundowns.data || [], budgets.data || [], volunteers.data || []);
+            },
+
+            // --- RENDERING ---
+
+            renderProjectList: (container) => {
+                let html = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Daftar Proyek Sankara</h2>
+                        <button onclick="app.toggleModal('modal-project')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                            <i class="fas fa-plus mr-2"></i> Buat Proyek
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                `;
+
+                if (app.projects.length === 0) {
+                    html += `<div class="col-span-3 text-center py-10 text-gray-500">Belum ada proyek. Klik tombol "Buat Proyek" atau "Generate Bandung" di sidebar.</div>`;
+                } else {
+                    app.projects.forEach(p => {
+                        html += `
+                            <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition p-5 cursor-pointer" onclick="app.getProjectDetails('${p.id}')">
+                                <div class="flex justify-between items-start mb-3">
+                                    <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded uppercase tracking-wide">${p.regional || 'Umum'}</span>
+                                    <span class="text-xs text-gray-400"><i class="far fa-calendar-alt mr-1"></i> ${p.event_date || '-'}</span>
+                                </div>
+                                <h3 class="text-lg font-bold text-gray-800 mb-1 leading-tight">${p.title}</h3>
+                                <p class="text-sm text-gray-500 mb-4 line-clamp-2">${p.theme || 'Tidak ada tema'}</p>
+                                <div class="flex items-center text-sm text-gray-600 border-t pt-3">
+                                    <div class="flex-1">
+                                        <i class="fas fa-user-tie text-green-600 mr-1"></i> ${p.leader || '-'}
+                                    </div>
+                                    <div>
+                                        <i class="fas fa-chevron-right text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                html += `</div>`;
+                container.innerHTML = html;
+            },
+
+            renderProjectDetailView: (project, rundowns, budgets, volunteers) => {
+                const container = document.getElementById('content-area');
+                
+                // Calculate Total Budget
+                const totalBudget = budgets.reduce((sum, item) => sum + (item.total_price || 0), 0);
+
+                const html = `
+                    <button onclick="app.showPage('projects')" class="mb-4 text-sm text-gray-500 hover:text-green-600"><i class="fas fa-arrow-left"></i> Kembali ke Daftar</button>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+                        <div class="bg-green-600 p-6 text-white">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="bg-green-700 bg-opacity-50 text-white text-xs px-2 py-1 rounded mb-2 inline-block">${project.regional}</span>
+                                    <h1 class="text-3xl font-bold">${project.title}</h1>
+                                    <p class="opacity-90 mt-1">${project.theme}</p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-bold">${app.formatDate(project.event_date)}</div>
+                                    <div class="text-sm opacity-75"><i class="fas fa-map-marker-alt mr-1"></i> ${project.location}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Project Leader</h4>
+                                <p class="font-semibold text-lg text-gray-800">${project.leader}</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Total Budget</h4>
+                                <p class="font-semibold text-lg text-green-600">${app.formatCurrency(totalBudget)}</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Status</h4>
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-semibold">${project.status}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs/Sections -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        <!-- RUNDOWN SECTION -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="far fa-clock text-green-600 mr-2"></i> Rundown Kegiatan</h3>
+                            <div class="space-y-4">
+                                ${rundowns.map(r => `
+                                    <div class="flex">
+                                        <div class="w-24 flex-shrink-0 text-sm font-bold text-gray-600">${r.time_start}</div>
+                                        <div class="flex-1 pb-4 border-l-2 border-green-200 pl-4 relative">
+                                            <div class="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-green-500"></div>
+                                            <div class="font-bold text-gray-800">${r.activity}</div>
+                                            <div class="text-sm text-gray-500 mt-1">${r.description || ''}</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ${rundowns.length === 0 ? '<p class="text-gray-400 italic">Belum ada rundown.</p>' : ''}
+                            </div>
+                        </div>
+
+                        <!-- BUDGET SECTION -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fas fa-coins text-green-600 mr-2"></i> Estimasi Biaya</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-50 text-gray-600 font-bold">
+                                        <tr>
+                                            <th class="p-2">Barang</th>
+                                            <th class="p-2 text-center">Jml</th>
+                                            <th class="p-2 text-right">Harga</th>
+                                            <th class="p-2 text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y">
+                                        ${budgets.map(b => `
+                                            <tr>
+                                                <td class="p-2 font-medium">${b.item_name}</td>
+                                                <td class="p-2 text-center">${b.quantity}</td>
+                                                <td class="p-2 text-right text-gray-500">${b.unit_price > 0 ? (b.unit_price/1000).toFixed(0) + 'k' : '-'}</td>
+                                                <td class="p-2 text-right font-bold">${b.total_price > 0 ? app.formatCurrency(b.total_price) : '-'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                    <tfoot class="border-t-2 border-gray-200">
+                                        <tr>
+                                            <td colspan="3" class="p-2 text-right font-bold">TOTAL</td>
+                                            <td class="p-2 text-right font-bold text-green-700">${app.formatCurrency(totalBudget)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- VOLUNTEERS SECTION -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 lg:col-span-2">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fas fa-users text-green-600 mr-2"></i> Divisi & Jobdesk</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${volunteers.map(v => `
+                                    <div class="border rounded-lg p-3 bg-gray-50">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="font-bold text-green-800">${v.role_name}</span>
+                                            <span class="bg-white border text-xs px-2 py-1 rounded-full">${v.count} Orang</span>
+                                        </div>
+                                        <p class="text-sm text-gray-600">${v.jobdesk}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                    </div>
+                `;
+                container.innerHTML = html;
+            },
+
+            // --- SEEDER FUNCTION (Hardcoded Bandung Data) ---
+            generateBandungData: async () => {
+                const conf = confirm("Apakah Anda ingin membuat data 'Bandung Menyapa #3' secara otomatis?");
+                if (!conf) return;
+
+                // 1. Create Project
+                const { data: proj, error: pErr } = await supabase.from('projects').insert([{
+                    title: "Bandung Menyapa #3: Painting & Fruit Sharing Day",
+                    regional: "Bandung",
+                    theme: "Buah-buahan & Kreativitas",
+                    leader: "Shafira",
+                    event_date: "2025-12-21",
+                    location: "Jalan Bijaksana Dalam, No. 11, Kota Bandung",
+                    status: "Planning"
+                }]).select().single();
+
+                if (pErr) { alert("Gagal buat project: " + pErr.message); return; }
+
+                const pid = proj.id;
+
+                // 2. Create Rundown
+                const rundowns = [
+                    { project_id: pid, time_start: "08.30", time_end: "08.45", activity: "Kumpul delegasi", description: "" },
+                    { project_id: pid, time_start: "08.45", time_end: "09.00", activity: "Briefing singkat", description: "" },
+                    { project_id: pid, time_start: "09.00", time_end: "09.15", activity: "Pembukaan MC", description: "Menyapa, Sambutan Leader & Yayasan, Doa" },
+                    { project_id: pid, time_start: "09.15", time_end: "10.15", activity: "Painting Totebag", description: "Divisi Program + PDD" },
+                    { project_id: pid, time_start: "10.15", time_end: "10.20", activity: "Istirahat", description: "Free time" },
+                    { project_id: pid, time_start: "10.20", time_end: "10.40", activity: "Penukaran Gambar", description: "Divisi Games: Tukar totebag dengan buah asli" },
+                    { project_id: pid, time_start: "10.40", time_end: "11.20", activity: "Edukasi Buah", description: "Divisi Edukasi: Makan buah bersama" },
+                    { project_id: pid, time_start: "11.20", time_end: "11.30", activity: "Penutupan & Dokumentasi", description: "Foto bersama, Video Tagline, Pembagian Konsumsi" },
+                    { project_id: pid, time_start: "11.30", time_end: "12.00", activity: "Evaluasi", description: "Dipimpin Project Leader" }
+                ];
+                await supabase.from('rundowns').insert(rundowns);
+
+                // 3. Create Budget
+                const budgets = [
+                    { project_id: pid, item_name: "Paket painting totebag", quantity: "20 pcs", unit_price: 13200, total_price: 264000 },
+                    { project_id: pid, item_name: "Konsumsi (makanan berat)", quantity: "35 packs", unit_price: 10000, total_price: 350000 },
+                    { project_id: pid, item_name: "Air mineral", quantity: "1 dus", unit_price: 25000, total_price: 25000 },
+                    { project_id: pid, item_name: "Bolu untuk delegasi", quantity: "2 dus", unit_price: 25000, total_price: 50000 },
+                    { project_id: pid, item_name: "Buah Pisang", quantity: "1 kg", unit_price: 12000, total_price: 12000 },
+                    { project_id: pid, item_name: "Buah Strawberry", quantity: "1/4 kg", unit_price: 10000, total_price: 10000 },
+                    { project_id: pid, item_name: "Buah Apel", quantity: "1/4 kg", unit_price: 0, total_price: 0 },
+                    { project_id: pid, item_name: "Buah Semangka", quantity: "1/2 kg", unit_price: 0, total_price: 0 },
+                    { project_id: pid, item_name: "Print Gambar Buah", quantity: "15 lembar", unit_price: 500, total_price: 7500 }
+                ];
+                await supabase.from('budgets').insert(budgets);
+
+                // 4. Create Volunteers
+                const volunteers = [
+                    { project_id: pid, role_name: "MC", count: 2, jobdesk: "Memandu jalannya kegiatan" },
+                    { project_id: pid, role_name: "Divisi Edukasi", count: 2, jobdesk: "Menjelaskan pentingnya buah kepada adik-adik" },
+                    { project_id: pid, role_name: "Divisi Games", count: 2, jobdesk: "Menyiapkan stand penukaran buah" },
+                    { project_id: pid, role_name: "Divisi Eco Print", count: 4, jobdesk: "Menyiapkan alat dan bahan, membagikan ke adik-adik" }
+                ];
+                await supabase.from('volunteers').insert(volunteers);
+
+                app.showToast("Data Bandung Menyapa #3 berhasil dibuat!");
+                app.fetchProjects();
+                app.showPage('projects');
+            }
+        };
+
+        // Initialize App
+        app.init();
+
+    </script>
+</body>
+</html>
