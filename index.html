@@ -115,7 +115,7 @@
 
     <!-- MODALS -->
 
-    <!-- Modal Project (With Add Regional Support) -->
+    <!-- Modal Project (Create Only - Edit is done via Step/Inline) -->
     <div id="modal-project" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-opacity">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
             <div class="bg-white px-6 py-4 border-b flex justify-between items-center">
@@ -132,7 +132,6 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Regional</label>
-                        <!-- INPUT LIST FOR ADDING NEW REGIONAL -->
                         <input type="text" list="regional-list" name="regional" id="project-regional" placeholder="Pilih / Ketik Baru..." required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                         <datalist id="regional-list">
                             <option value="Bandung">
@@ -161,17 +160,9 @@
                         <input type="text" name="location" id="project-location" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Status Tahapan (SOP)</label>
-                    <select name="status" id="project-status" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition">
-                        <option value="Tahap 1: Submit Proposal">1. Submit Proposal (Max H-18)</option>
-                        <option value="Tahap 2: Media & Finance">2. Media & Finance (Max H-15)</option>
-                        <option value="Tahap 3: Rekrutmen & Pembelian">3. Rekrutmen & Pembelian (H-15 s/d H-5)</option>
-                        <option value="Tahap 4: First Meet">4. First Meet (H-3)</option>
-                        <option value="Tahap 5: Kegiatan">5. Kegiatan (H-0)</option>
-                        <option value="Tahap 6: Laporan">6. Laporan (Max H+2)</option>
-                    </select>
-                </div>
+                <!-- Initial status default to step 1 -->
+                <input type="hidden" name="status" id="project-status" value="Tahap 1: Submit Proposal">
+                
                 <div class="pt-2">
                     <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-green-200">Simpan Proyek</button>
                 </div>
@@ -179,7 +170,7 @@
         </div>
     </div>
 
-    <!-- Generic Modal -->
+    <!-- Generic Modal for Sub-items -->
     <div id="modal-generic" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
@@ -261,60 +252,87 @@
                 app.renderProjectDetailView(proj.data, rundowns.data || [], budgets.data || [], volunteers.data || [], files.data || []);
             },
 
-            // --- DIRECT STATUS UPDATE ---
-            updateProjectStatus: async (id, status) => {
-                if(!confirm(`Ubah status proyek menjadi "${status}"?`)) return;
-                const { error } = await supabase.from('projects').update({ status: status }).eq('id', id);
-                if(error) app.showToast("Gagal update status: " + error.message);
-                else {
-                    app.showToast("Status diperbarui!");
-                    app.getProjectDetails(id);
+            // --- NEW: STEP REQUIREMENT MODALS ---
+            
+            openStepRequirementModal: (projectId, stepId, currentStatus, currentData) => {
+                // Determine content based on step
+                let title = `Update ke Tahap ${stepId}`;
+                let html = ``;
+                const safeStatus = SOP_STEPS.find(s => s.id === stepId)?.fullStatus;
+
+                html += `<form id="form-step-update" class="space-y-4">
+                            <input type="hidden" name="id" value="${projectId}">
+                            <input type="hidden" name="status" value="${safeStatus}">`;
+
+                if (stepId === 1) {
+                    title = "Submit Proposal (Tahap 1)";
+                    html += `
+                        <div class="bg-blue-50 p-3 rounded-lg text-sm text-blue-700 mb-2">
+                            <i class="fas fa-info-circle mr-1"></i> Mohon lengkapi data target panti/sekolah.
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">Target Panti/Yayasan/Sekolah</label>
+                            <input type="text" name="target_audience" value="${currentData.target_audience || ''}" placeholder="Nama & Alamat Lengkap" class="w-full border rounded-lg px-3 py-2" required>
+                        </div>
+                    `;
+                } else if (stepId === 2) {
+                    title = "Media & Finance (Tahap 2)";
+                    html += `
+                         <div class="bg-blue-50 p-3 rounded-lg text-sm text-blue-700 mb-2">
+                            <i class="fas fa-info-circle mr-1"></i> Masukkan link RAB dan list Media Partner.
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">Link RAB (Spreadsheet)</label>
+                            <input type="text" name="rab_link" value="${currentData.rab_link || ''}" placeholder="https://..." class="w-full border rounded-lg px-3 py-2" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">Media Partners</label>
+                            <textarea name="media_partners" placeholder="List nama media partner..." class="w-full border rounded-lg px-3 py-2" rows="3">${currentData.media_partners || ''}</textarea>
+                        </div>
+                    `;
+                } else {
+                    title = `Konfirmasi Tahap ${stepId}`;
+                    html += `
+                        <p class="text-slate-600">Apakah Anda yakin ingin mengubah status proyek menjadi <strong>${safeStatus}</strong>?</p>
+                    `;
                 }
+
+                html += `<button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-bold mt-4">Simpan & Update Status</button>
+                        </form>`;
+
+                // Open Generic Modal with this content
+                app.openGeneric(title, html, async (e) => {
+                    e.preventDefault();
+                    await app.handleFormSubmit(e.target, 'projects', () => app.getProjectDetails(projectId));
+                });
             },
+
 
             // --- RENDER DASHBOARD (MASTER GANTT) ---
             renderDashboard: (container) => {
                 const total = app.projects.length;
                 const completed = app.projects.filter(p => p.status.includes('Tahap 6')).length;
                 const ongoing = total - completed;
-
-                // Group Projects by Regional
                 const regionals = [...new Set(app.projects.map(p => p.regional || 'Lainnya'))].sort();
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
                 let timelineHtml = '';
                 
                 regionals.forEach(reg => {
                     const regionalProjects = app.projects.filter(p => (p.regional || 'Lainnya') === reg);
-                    
                     timelineHtml += `
                         <div class="border-b border-slate-100 hover:bg-slate-50 transition">
                             <div class="flex items-stretch min-h-[60px]">
-                                <!-- Regional Header (Left Sticky) -->
                                 <div class="w-[150px] flex-shrink-0 bg-white border-r border-slate-200 p-3 flex flex-col justify-center sticky left-0 z-10 shadow-[4px_0_4px_-2px_rgba(0,0,0,0.05)]">
                                     <span class="font-bold text-slate-700 text-sm truncate" title="${reg}">${reg}</span>
                                     <span class="text-[10px] text-slate-400">${regionalProjects.length} Event</span>
                                 </div>
-                                
-                                <!-- Timeline Grid -->
                                 <div class="flex-1 grid grid-cols-12 relative min-w-[800px]">
-                                    <!-- Grid Lines -->
                                     ${months.map(() => `<div class="border-r border-dashed border-slate-200 h-full"></div>`).join('')}
-                                    
-                                    <!-- Project Bars -->
                                     ${regionalProjects.map(p => {
                                         if (!p.event_date) return '';
                                         const d = new Date(p.event_date);
-                                        const mIndex = d.getMonth(); // 0-11
-                                        // Simple Logic: Show a dot/bar at the event month
-                                        return `
-                                            <div class="absolute top-1/2 -translate-y-1/2 h-8 bg-green-100 border border-green-300 rounded-md px-2 flex items-center shadow-sm cursor-pointer hover:bg-green-200 z-0 text-xs text-green-800 font-medium whitespace-nowrap overflow-hidden transition"
-                                                 style="left: calc(${(mIndex * (100/12))}% + 5px); width: calc((100%/12) * 1.5);"
-                                                 onclick="app.getProjectDetails('${p.id}')">
-                                                 <div class="w-2 h-2 rounded-full bg-green-600 mr-2 flex-shrink-0"></div>
-                                                 ${p.title}
-                                            </div>
-                                        `;
+                                        const mIndex = d.getMonth();
+                                        return `<div class="absolute top-1/2 -translate-y-1/2 h-8 bg-green-100 border border-green-300 rounded-md px-2 flex items-center shadow-sm cursor-pointer hover:bg-green-200 z-0 text-xs text-green-800 font-medium whitespace-nowrap overflow-hidden transition" style="left: calc(${(mIndex * (100/12))}% + 5px); width: calc((100%/12) * 1.5);" onclick="app.getProjectDetails('${p.id}')"><div class="w-2 h-2 rounded-full bg-green-600 mr-2 flex-shrink-0"></div>${p.title}</div>`;
                                     }).join('')}
                                 </div>
                             </div>
@@ -327,8 +345,6 @@
                         <h2 class="text-2xl font-bold text-slate-800">Dashboard & Master Timeline</h2>
                         <p class="text-slate-500">Monitoring seluruh event per regional</p>
                     </div>
-
-                    <!-- Stats Cards -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div class="bg-white p-5 rounded-xl border border-slate-200 flex items-center shadow-sm">
                             <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-4"><i class="fas fa-folder"></i></div>
@@ -343,8 +359,6 @@
                             <div><div class="text-2xl font-bold">${completed}</div><div class="text-xs text-slate-500">Selesai</div></div>
                         </div>
                     </div>
-
-                    <!-- MASTER TIMELINE GANTT -->
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-10">
                         <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <h3 class="font-bold text-slate-700"><i class="fas fa-stream mr-2"></i> Timeline Event 2025</h3>
@@ -352,14 +366,12 @@
                         </div>
                         <div class="overflow-x-auto custom-scrollbar">
                             <div class="min-w-[950px]">
-                                <!-- Header Months -->
                                 <div class="flex border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase">
                                     <div class="w-[150px] p-3 flex-shrink-0 sticky left-0 bg-slate-50 z-20 border-r border-slate-200">Regional</div>
                                     <div class="flex-1 grid grid-cols-12 text-center">
                                         ${months.map(m => `<div class="p-3 border-r border-slate-200">${m}</div>`).join('')}
                                     </div>
                                 </div>
-                                <!-- Body -->
                                 ${regionals.length > 0 ? timelineHtml : '<div class="p-8 text-center text-slate-400 italic">Belum ada data proyek.</div>'}
                             </div>
                         </div>
@@ -412,7 +424,7 @@
                                         <tbody class="divide-y divide-slate-50">
                                             ${projects.map(p => {
                                                 const stepNum = parseInt((p.status||'').split(':')[0].replace('Tahap ','') || 1);
-                                                const pct = (stepNum/6)*100; // Updated division by 6
+                                                const pct = (stepNum/6)*100;
                                                 return `
                                                 <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="app.getProjectDetails('${p.id}')">
                                                     <td class="p-4 font-medium text-slate-800">${p.title}<div class="text-xs text-slate-400 font-normal md:hidden">${p.leader}</div></td>
@@ -439,13 +451,18 @@
                 container.innerHTML = html;
             },
 
-            // --- RENDER DETAIL VIEW ---
+            // --- RENDER DETAIL VIEW (Updated with Requirements Info) ---
             renderProjectDetailView: (project, rundowns, budgets, volunteers, files) => {
                 const container = document.getElementById('content-area');
                 const safeProj = JSON.stringify(project).replace(/"/g, '&quot;');
                 let currentStep = 1;
                 if (project.status && project.status.includes('Tahap')) currentStep = parseInt(project.status.split(':')[0].replace('Tahap ', ''));
                 const totalBudget = budgets.reduce((sum, b) => sum + (b.total_price || 0), 0);
+
+                // Safe data checks for new fields
+                const target = project.target_audience ? `<div class="mt-2 text-sm text-slate-600"><span class="font-bold text-slate-700">Target:</span> ${project.target_audience}</div>` : '';
+                const media = project.media_partners ? `<div class="mt-1 text-sm text-slate-600"><span class="font-bold text-slate-700">Media Partners:</span> ${project.media_partners}</div>` : '';
+                const rab = project.rab_link ? `<div class="mt-1 text-sm"><a href="${project.rab_link}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-link mr-1"></i> Link RAB</a></div>` : '';
 
                 let html = `
                     <div class="flex items-center gap-2 text-sm text-slate-500 mb-6">
@@ -455,22 +472,29 @@
                     </div>
 
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6 relative group">
-                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition z-10">
-                            <button onclick="app.openProjectModal(${safeProj})" class="bg-slate-100 text-slate-600 hover:text-green-600 px-3 py-1.5 rounded-lg text-sm transition"><i class="fas fa-pen mr-1"></i> Edit</button>
-                        </div>
+                        <!-- EDIT BUTTON REMOVED AS REQUESTED -->
+                        
                         <div class="flex flex-col md:flex-row justify-between md:items-start gap-4">
-                            <div>
+                            <div class="flex-1">
                                 <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-3 inline-block uppercase tracking-wider">${project.regional}</span>
                                 <h1 class="text-3xl font-bold text-slate-800 mb-2">${project.title}</h1>
-                                <p class="text-slate-600"><span class="font-semibold">Tema:</span> ${project.theme}</p>
+                                <p class="text-slate-600 mb-2"><span class="font-semibold">Tema:</span> ${project.theme}</p>
+                                
+                                <!-- Info Tambahan dari Step Requirement -->
+                                ${target}
+                                ${media}
+                                ${rab}
                             </div>
-                            <div class="text-right"><div class="text-xl font-bold text-slate-800">${app.formatDate(project.event_date)}</div><div class="text-xs text-slate-500">${project.location}</div></div>
+                            <div class="text-right flex-shrink-0">
+                                <div class="text-xl font-bold text-slate-800">${app.formatDate(project.event_date)}</div>
+                                <div class="text-xs text-slate-500">${project.location}</div>
+                            </div>
                         </div>
 
-                        <!-- Stepper (Interactive) -->
+                        <!-- Stepper (Interactive with Modal) -->
                         <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between w-full overflow-x-auto pb-2">
                             ${SOP_STEPS.map((step, idx) => `
-                                <div class="flex flex-col items-center relative flex-1 min-w-[80px] group cursor-pointer" onclick="app.updateProjectStatus('${project.id}', '${step.fullStatus}')" title="Klik untuk ubah ke tahap ini">
+                                <div class="flex flex-col items-center relative flex-1 min-w-[80px] group cursor-pointer" onclick='app.openStepRequirementModal("${project.id}", ${step.id}, "${project.status}", ${safeProj})' title="Klik untuk update data tahap ini">
                                     <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-2 border-2 transition-all group-hover:scale-110 ${step.id <= currentStep ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-200 text-slate-300 group-hover:border-green-300'}">${step.id}</div>
                                     <div class="text-[10px] font-bold text-center ${step.id <= currentStep ? 'text-slate-800' : 'text-slate-400'}">${step.name}</div>
                                     <div class="text-[9px] text-slate-400 text-center">${step.desc}</div>
@@ -528,16 +552,14 @@
                 container.innerHTML = html;
             },
 
-            // --- GANTT RENDERER HELPER ---
+            // --- GANTT RENDERER HELPER (unchanged) ---
             renderGanttChart: (eventDateStr) => {
                 if(!eventDateStr) return '<div class="text-center text-slate-400 text-sm py-4">Tentukan tanggal acara untuk melihat timeline</div>';
-                
-                // UPDATED TIMELINE BASED ON USER REQUEST
                 const timeline = [
-                    { name: "Submit Proposal (Max H-18)", startDaysBefore: 25, duration: 7, color: "bg-purple-400" }, // Est. 1 week prep
+                    { name: "Submit Proposal (Max H-18)", startDaysBefore: 25, duration: 7, color: "bg-purple-400" },
                     { name: "Media & Finance (Max H-15)", startDaysBefore: 18, duration: 3, color: "bg-blue-400" },
                     { name: "Rekrutmen (H-15 s/d H-5)", startDaysBefore: 15, duration: 10, color: "bg-teal-400" },
-                    { name: "Pembelian (H-15 s/d Meet)", startDaysBefore: 15, duration: 12, color: "bg-yellow-400" }, // H-15 to H-3
+                    { name: "Pembelian (H-15 s/d Meet)", startDaysBefore: 15, duration: 12, color: "bg-yellow-400" },
                     { name: "First Meet (H-3)", startDaysBefore: 3, duration: 1, color: "bg-orange-400" },
                     { name: "Kegiatan (H-0)", startDaysBefore: 0, duration: 1, color: "bg-green-500" },
                     { name: "Laporan (Max H+2)", startDaysBefore: -1, duration: 2, color: "bg-slate-400" } 
