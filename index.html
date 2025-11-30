@@ -816,64 +816,72 @@
             },
 
             // PERBAIKAN: Fungsi updateStepApproval dengan auto-update status proyek
-            updateStepApproval: async (projectId, stepNumber, newStatus, notes = '') => {
-                // PERBAIKAN: Hanya cek permission untuk approve/reject, bukan untuk submit
-                if ((newStatus === APPROVAL_STATUS.APPROVED || newStatus === APPROVAL_STATUS.REJECTED) && 
-                    !app.hasPermission('approve_project')) {
-                    app.showToast("Hanya admin yang dapat menyetujui/menolak proyek");
-                    return;
-                }
+updateStepApproval: async (projectId, stepNumber, newStatus, notes = '') => {
+    // PERBAIKAN: Hanya cek permission untuk approve/reject, bukan untuk submit
+    if ((newStatus === APPROVAL_STATUS.APPROVED || newStatus === APPROVAL_STATUS.REJECTED) && 
+        !app.hasPermission('approve_project')) {
+        app.showToast("Hanya admin yang dapat menyetujui/menolak proyek");
+        return;
+    }
 
-                try {
-                    const updateData = {
-                        project_id: projectId,
-                        step_number: stepNumber,
-                        status: newStatus,
-                        submitted_at: new Date().toISOString()
-                    };
+    try {
+        const updateData = {
+            project_id: projectId,
+            step_number: stepNumber,
+            status: newStatus,
+            submitted_at: new Date().toISOString()
+        };
 
-                    // Tambahkan approved_at hanya jika status approved
-                    if (newStatus === APPROVAL_STATUS.APPROVED) {
-                        updateData.approved_at = new Date().toISOString();
-                    }
+        // Tambahkan approved_at hanya jika status approved
+        if (newStatus === APPROVAL_STATUS.APPROVED) {
+            updateData.approved_at = new Date().toISOString();
+        }
 
-                    // Tambahkan notes jika ada
-                    if (notes) {
-                        updateData.notes = notes;
-                    }
+        // Tambahkan notes jika ada
+        if (notes) {
+            updateData.notes = notes;
+        }
 
-                    const { error } = await supabase
-                        .from('project_approvals')
-                        .upsert([updateData]);
+        const { error } = await supabase
+            .from('project_approvals')
+            .upsert([updateData]);
+        
+        if (error) {
+            app.showToast("Gagal update approval: " + error.message);
+        } else {
+            const statusText = newStatus === APPROVAL_STATUS.APPROVED ? 'disetujui' : 
+                              newStatus === APPROVAL_STATUS.REJECTED ? 'ditolak' : 'diajukan';
+            app.showToast(`Step berhasil ${statusText}`);
+            
+            // PERBAIKAN: Jika step disetujui, update status proyek ke step berikutnya
+            if (newStatus === APPROVAL_STATUS.APPROVED) {
+                const currentStep = SOP_STEPS.find(s => s.id === stepNumber);
+                if (currentStep && currentStep.nextStatus) {
+                    await supabase
+                        .from('projects')
+                        .update({ status: currentStep.nextStatus })
+                        .eq('id', projectId);
                     
-                    if (error) {
-                        app.showToast("Gagal update approval: " + error.message);
-                    } else {
-                        const statusText = newStatus === APPROVAL_STATUS.APPROVED ? 'disetujui' : 
-                                          newStatus === APPROVAL_STATUS.REJECTED ? 'ditolak' : 'diajukan';
-                        app.showToast(`Step berhasil ${statusText}`);
-                        
-                        // PERBAIKAN: Jika step disetujui, update status proyek ke step berikutnya
-                        if (newStatus === APPROVAL_STATUS.APPROVED) {
-                            const currentStep = SOP_STEPS.find(s => s.id === stepNumber);
-                            if (currentStep && currentStep.nextStatus) {
-                                await supabase
-                                    .from('projects')
-                                    .update({ status: currentStep.nextStatus })
-                                    .eq('id', projectId);
-                                
-                                app.showToast(`Proyek berhasil dipindahkan ke ${currentStep.nextStatus}`);
-                            }
-                        }
-                        
-                        app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
-                        app.getProjectDetails(projectId, stepNumber);
-                    }
-                } catch (error) {
-                    console.error('Error in updateStepApproval:', error);
-                    app.showToast("Terjadi error saat update approval");
+                    app.showToast(`Proyek berhasil dipindahkan ke ${currentStep.nextStatus}`);
                 }
-            },
+            }
+            
+            // PERBAIKAN: Refresh data approvals tanpa memanggil getProjectDetails berulang
+            app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
+            
+            // PERBAIKAN: Hanya refresh jika diperlukan, hindari infinite loop
+            if (app.activeProjectId === projectId) {
+                // Refresh current view dengan data terbaru
+                setTimeout(() => {
+                    app.getProjectDetails(projectId, stepNumber);
+                }, 500);
+            }
+        }
+    } catch (error) {
+        console.error('Error in updateStepApproval:', error);
+        app.showToast("Terjadi error saat update approval");
+    }
+},
 
             showPage: async (pageName) => {
                 if (app.isLoading) return;
