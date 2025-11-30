@@ -313,7 +313,8 @@
                 if(!p) return App.router('projects');
 
                 const [rundowns, budgets, volunteers, approvals, games] = await Promise.all([
-                    Core.supabase.from('rundowns').select('*').eq('project_id', id).order('id'),
+                    // MODIFIED: Sorting by time_start for chronological order
+                    Core.supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', { ascending: true }),
                     Core.supabase.from('budgets').select('*').eq('project_id', id).order('id'),
                     Core.supabase.from('volunteers').select('*').eq('project_id', id),
                     Core.supabase.from('project_approvals').select('*').eq('project_id', id),
@@ -577,7 +578,22 @@
             },
             
             openRundownModal: (pid) => {
-                Core.openGenericModal('Tambah Rundown', `<form onsubmit="event.preventDefault();UserModule.saveItem('rundowns','${pid}',this)"><div class="flex gap-2 mb-2"><input name="time_start" placeholder="Mulai" class="w-full border p-2 rounded"><input name="time_end" placeholder="Selesai" class="w-full border p-2 rounded"></div><input name="activity" placeholder="Kegiatan" class="w-full border p-2 rounded" required><button class="w-full bg-green-600 text-white py-2 rounded mt-4">Simpan</button></form>`);
+                Core.openGenericModal('Tambah Rundown', 
+                `<form onsubmit="event.preventDefault();UserModule.saveItem('rundowns','${pid}',this)">
+                    <div class="flex gap-2 mb-2">
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-500 mb-1">JAM MULAI</label>
+                            <input type="time" name="time_start" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-500 mb-1">JAM SELESAI</label>
+                            <input type="time" name="time_end" class="w-full border p-2 rounded" required>
+                        </div>
+                    </div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">KEGIATAN</label>
+                    <input name="activity" placeholder="Nama Kegiatan" class="w-full border p-2 rounded mb-4" required>
+                    <button class="w-full bg-green-600 text-white py-2 rounded mt-4 font-bold">Simpan</button>
+                </form>`);
             },
 
             saveItem: async (table, pid, form) => {
