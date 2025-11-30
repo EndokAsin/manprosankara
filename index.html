@@ -785,6 +785,23 @@
 
             submitStepForApproval: async (projectId, stepNumber) => {
                 try {
+                    // PERBAIKAN: Simpan data proposal terlebih dahulu sebelum submit approval
+                    if (stepNumber === 1) {
+                        const targetAudience = document.getElementById('inp-target')?.value;
+                        const conceptNote = document.getElementById('inp-concept')?.value;
+                        
+                        if (targetAudience || conceptNote) {
+                            const updates = {};
+                            if (targetAudience) updates.target_audience = targetAudience;
+                            if (conceptNote) updates.concept_note = conceptNote;
+                            
+                            await supabase
+                                .from('projects')
+                                .update(updates)
+                                .eq('id', projectId);
+                        }
+                    }
+
                     const { error } = await supabase
                         .from('project_approvals')
                         .upsert([
@@ -847,12 +864,18 @@
                         app.showToast(`Step berhasil ${statusText}`);
                         app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
                         
-                        // Jika step 6 disetujui, update status proyek menjadi selesai
-                        if (newStatus === APPROVAL_STATUS.APPROVED && stepNumber === 6) {
-                            await supabase
-                                .from('projects')
-                                .update({ status: 'Tahap 6: Laporan - Selesai' })
-                                .eq('id', projectId);
+                        // Jika step disetujui, update status proyek ke step berikutnya
+                        if (newStatus === APPROVAL_STATUS.APPROVED) {
+                            const nextStep = stepNumber + 1;
+                            if (nextStep <= 6) {
+                                const nextStepInfo = SOP_STEPS.find(s => s.id === nextStep);
+                                if (nextStepInfo) {
+                                    await supabase
+                                        .from('projects')
+                                        .update({ status: nextStepInfo.fullStatus })
+                                        .eq('id', projectId);
+                                }
+                            }
                         }
                         
                         app.getProjectDetails(projectId, stepNumber);
@@ -963,8 +986,14 @@
                                 </div>
                             </div>
                             <div class="space-y-4">
-                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Target Panti/Fasilitas</label><input type="text" id="inp-target" value="${project.target_audience || ''}" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Nama, Alamat..."></div>
-                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Konsep Acara</label><textarea id="inp-concept" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Jelaskan konsep...">${project.concept_note || ''}</textarea></div>
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">Target Panti/Fasilitas</label>
+                                    <input type="text" id="inp-target" value="${project.target_audience || ''}" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Nama, Alamat...">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1">Konsep Acara</label>
+                                    <textarea id="inp-concept" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Jelaskan konsep...">${project.concept_note || ''}</textarea>
+                                </div>
                                 
                                 ${stepStatus === APPROVAL_STATUS.PENDING ? `
                                     <button onclick="app.submitStepForApproval('${project.id}', 1)" class="w-full mt-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
