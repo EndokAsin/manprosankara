@@ -30,10 +30,59 @@
         .gantt-item:hover { transform: scale(1.02); }
         .timeline-milestone { position: relative; }
         .timeline-milestone::before { content: ''; position: absolute; left: -8px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #16a34a; }
+        .page-transition { transition: all 0.3s ease-in-out; }
+        .page-enter { opacity: 0; transform: translateY(10px); }
+        .page-enter-active { opacity: 1; transform: translateY(0); }
+        
+        /* Sidebar active state */
+        .sidebar-item { transition: all 0.2s ease; }
+        .sidebar-item.active {
+            background-color: #f0fdf4;
+            color: #059669;
+            box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.1), 0 2px 4px -1px rgba(5, 150, 105, 0.06);
+            border: 1px solid #bbf7d0;
+        }
+        .sidebar-item:not(.active):hover {
+            background-color: #f8fafc;
+            color: #059669;
+        }
+        
+        /* Status Badge Styles */
+        .status-badge {
+            @apply px-3 py-1 rounded-full text-xs font-bold border;
+        }
+        .status-pending {
+            @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+        }
+        .status-submitted {
+            @apply bg-blue-100 text-blue-800 border-blue-200;
+        }
+        .status-approved {
+            @apply bg-green-100 text-green-800 border-green-200;
+        }
+        .status-rejected {
+            @apply bg-red-100 text-red-800 border-red-200;
+        }
+        
+        /* Step validation styles */
+        .step-locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .step-unlocked {
+            cursor: pointer;
+        }
+        .validation-error {
+            @apply bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4;
+        }
+        
+        /* Login modal styles */
+        .login-modal {
+            backdrop-filter: blur(8px);
+        }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen flex overflow-hidden">
-
     <!-- Notification Toast -->
     <div id="toast" class="fixed top-5 right-5 z-50 transform transition-transform translate-x-full duration-300">
         <div class="bg-white border-l-4 border-green-500 rounded-lg shadow-xl p-4 flex items-center pr-8">
@@ -42,89 +91,174 @@
         </div>
     </div>
 
-    <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <div class="p-6 flex items-center border-b border-slate-100">
-            <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-lg shadow-green-200">S</div>
-            <h1 class="text-xl font-bold tracking-tight text-slate-800">SANKARA <span class="text-green-600">PM</span></h1>
-        </div>
-        <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-            <button onclick="app.showPage('dashboard')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-600 hover:text-green-700 font-medium transition flex items-center group">
-                <i class="fas fa-chart-pie w-6 text-slate-400 group-hover:text-green-600 transition"></i> Dashboard
-            </button>
-            <button onclick="app.showPage('projects')" class="w-full text-left px-4 py-3 rounded-xl bg-green-50 text-green-700 font-medium transition flex items-center shadow-sm shadow-green-100 ring-1 ring-green-200">
-                <i class="fas fa-layer-group w-6"></i> Manajemen Proyek
-            </button>
-        </nav>
-        <div class="p-4 border-t border-slate-100 bg-slate-50">
-            <button onclick="app.generateBandungData()" class="w-full bg-white border border-green-200 text-green-700 text-xs py-2.5 px-3 rounded-lg hover:bg-green-50 transition font-semibold shadow-sm flex justify-center items-center">
-                <i class="fas fa-magic mr-2"></i> Generate Dummy
-            </button>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#f8fafc]">
-        <!-- Mobile Header -->
-        <header class="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
-            <div class="font-bold text-green-700 flex items-center gap-2">
-                <div class="w-6 h-6 bg-green-600 rounded text-white flex items-center justify-center text-xs">S</div>
-                SANKARA
-            </div>
-            <button class="text-slate-600"><i class="fas fa-bars"></i></button>
-        </header>
-
-        <!-- Content Area -->
-        <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar">
-            <div class="flex flex-col justify-center items-center h-full text-slate-400">
-                <div class="loading-spinner mb-3"></div><span class="text-sm font-medium">Memuat Data...</span>
-            </div>
-        </div>
-    </main>
-
-    <!-- Generic Modal -->
-    <div id="modal-generic" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 login-modal">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
             <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="font-bold text-lg text-slate-800" id="modal-generic-title">Modal</h3>
-                <button onclick="app.toggleModal('modal-generic')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                <h3 class="font-bold text-lg text-slate-800">Login Admin</h3>
+                <button onclick="app.toggleModal('login-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
-            <div id="modal-generic-content" class="p-6"></div>
+            <form id="login-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Email Admin</label>
+                    <input type="email" id="login-email" required 
+                           class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                           placeholder="Masukkan email admin">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                    <input type="password" id="login-password" required 
+                           class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                           placeholder="Masukkan password">
+                </div>
+                
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-green-200">
+                    Masuk sebagai Admin
+                </button>
+            </form>
         </div>
     </div>
 
-    <!-- Modal Project (Create) -->
-    <div id="modal-project" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-opacity">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
-            <div class="bg-white px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="font-bold text-lg text-slate-800">Proyek Baru</h3>
-                <button onclick="app.toggleModal('modal-project')" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
+    <!-- Main Application -->
+    <div id="app-screen" class="h-screen flex overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+            <div class="p-6 flex items-center justify-between border-b border-slate-100">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-lg shadow-green-200">S</div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-800">SANKARA <span class="text-green-600">PM</span></h1>
+                </div>
             </div>
-            <form id="form-project" class="p-6 space-y-4">
-                <input type="hidden" name="id" id="project-id">
-                <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nama Kegiatan</label><input type="text" name="title" required class="w-full border rounded-lg px-3 py-2"></div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Regional</label>
-                        <div class="flex gap-2">
-                            <select name="regional" id="regional-select" required class="w-full border rounded-lg px-3 py-2">
-                                <option value="">Pilih Regional</option>
-                            </select>
-                            <button type="button" onclick="app.openRegionalModal()" class="bg-green-100 text-green-700 px-3 rounded-lg border border-green-200 hover:bg-green-200 transition">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
+            
+            <!-- User Info -->
+            <div class="p-4 border-b border-slate-100">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Leader</label><input type="text" name="leader" class="w-full border rounded-lg px-3 py-2"></div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-slate-800 truncate" id="user-name">Guest User</p>
+                        <p class="text-xs text-slate-500 truncate" id="user-email">Mode Tamu</p>
+                        <p class="text-xs">
+                            <span id="user-role" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">Guest</span>
+                            <span id="user-regional" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 ml-1">All Regional</span>
+                        </p>
+                    </div>
                 </div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Tema</label><input type="text" name="theme" class="w-full border rounded-lg px-3 py-2"></div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Tanggal</label><input type="date" name="event_date" required class="w-full border rounded-lg px-3 py-2"></div>
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Lokasi</label><input type="text" name="location" class="w-full border rounded-lg px-3 py-2"></div>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+                <button id="sidebar-dashboard" onclick="app.showPage('dashboard')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-green-50 text-slate-600 hover:text-green-700 font-medium transition flex items-center group">
+                    <i class="fas fa-chart-pie w-6 text-slate-400 group-hover:text-green-600 transition"></i> Dashboard
+                </button>
+                <button id="sidebar-projects" onclick="app.showPage('projects')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item bg-green-50 text-green-700 font-medium transition flex items-center shadow-sm shadow-green-100 ring-1 ring-green-200 active">
+                    <i class="fas fa-layer-group w-6 text-green-600"></i> Manajemen Proyek
+                </button>
+                
+                <!-- Admin Only Menu -->
+                <div id="admin-menu" class="hidden">
+                    <div class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mt-6 mb-2">Admin</div>
+                    <button id="sidebar-approvals" onclick="app.showPage('approvals')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-medium transition flex items-center group">
+                        <i class="fas fa-check-circle w-6 text-slate-400 group-hover:text-blue-600 transition"></i> Approval Proyek
+                    </button>
+                    <button id="sidebar-users" onclick="app.showPage('users')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-purple-50 text-slate-600 hover:text-purple-700 font-medium transition flex items-center group">
+                        <i class="fas fa-users w-6 text-slate-400 group-hover:text-purple-600 transition"></i> Manajemen User
+                    </button>
                 </div>
-                <input type="hidden" name="status" value="Tahap 1: Submit Proposal">
-                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition">Simpan Proyek</button>
-            </form>
+            </nav>
+            
+            <div class="p-4 border-t border-slate-100 bg-slate-50">
+                <button id="login-button" onclick="app.toggleModal('login-modal')" class="w-full flex items-center justify-center px-4 py-2 bg-green-600 border border-green-600 rounded-xl text-white hover:bg-green-700 transition font-medium">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Login Admin
+                </button>
+                <button id="logout-button" onclick="app.logout()" class="w-full hidden items-center justify-center px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-800 hover:border-slate-300 transition font-medium mt-2">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#f8fafc]">
+            <!-- Header -->
+            <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
+                <div class="font-bold text-green-700 flex items-center gap-2">
+                    <div class="w-6 h-6 bg-green-600 rounded text-white flex items-center justify-center text-xs">S</div>
+                    <span class="hidden md:inline">SANKARA PROJECT MANAGEMENT</span>
+                    <span class="md:hidden">SANKARA</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- Admin Badge -->
+                    <div id="admin-badge" class="hidden">
+                        <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs font-bold border border-purple-200">
+                            <i class="fas fa-crown mr-1"></i> Admin
+                        </span>
+                    </div>
+                    
+                    <!-- Login/User Info -->
+                    <div class="flex items-center gap-2">
+                        <span id="header-user-name" class="text-sm text-slate-600 hidden md:block">Guest Mode</span>
+                        <button id="header-login-button" onclick="app.toggleModal('login-modal')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-sign-in-alt mr-1"></i> Login
+                        </button>
+                        <button id="header-logout-button" onclick="app.logout()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition hidden">
+                            <i class="fas fa-sign-out-alt mr-1"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar">
+                <!-- Default content akan diisi oleh JavaScript -->
+            </div>
+        </main>
+
+        <!-- Modal Project -->
+        <div id="modal-project" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-opacity">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
+                <div class="bg-white px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-slate-800">Proyek Baru</h3>
+                    <button onclick="app.toggleModal('modal-project')" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
+                </div>
+                <form id="form-project" class="p-6 space-y-4">
+                    <input type="hidden" name="id" id="project-id">
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nama Kegiatan</label><input type="text" name="title" required class="w-full border rounded-lg px-3 py-2"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Regional</label>
+                            <div class="flex gap-2">
+                                <select name="regional" id="regional-select" required class="w-full border rounded-lg px-3 py-2">
+                                    <option value="">Pilih Regional</option>
+                                </select>
+                                <button type="button" onclick="app.openRegionalModal()" class="bg-green-100 text-green-700 px-3 rounded-lg border border-green-200 hover:bg-green-200 transition">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Leader</label><input type="text" name="leader" class="w-full border rounded-lg px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Tema</label><input type="text" name="theme" class="w-full border rounded-lg px-3 py-2"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Tanggal</label><input type="date" name="event_date" required class="w-full border rounded-lg px-3 py-2"></div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Lokasi</label><input type="text" name="location" class="w-full border rounded-lg px-3 py-2"></div>
+                    </div>
+                    <input type="hidden" name="status" value="Tahap 1: Submit Proposal">
+                    <input type="hidden" name="finance_status" value="Belum Diajukan">
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition">Simpan Proyek</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Generic Modal -->
+        <div id="modal-generic" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-slate-800" id="modal-generic-title">Modal</h3>
+                    <button onclick="app.toggleModal('modal-generic')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="modal-generic-content" class="p-6"></div>
+            </div>
         </div>
     </div>
 
@@ -134,166 +268,552 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- 6 STEPS SOP SESUAI INSTRUKSI BARU ---
+        // --- 6 STEPS SOP ---
         const SOP_STEPS = [
             { 
                 id: 1, 
                 name: "Submit Proposal", 
                 desc: "Paling telat H-18", 
                 fullStatus: "Tahap 1: Submit Proposal",
-                deadline: "H-18"
+                deadline: "H-18",
+                requiresApproval: true
             },
             { 
                 id: 2, 
                 name: "Media & Finance", 
                 desc: "Paling telat H-15", 
                 fullStatus: "Tahap 2: Media & Finance",
-                deadline: "H-15"
+                deadline: "H-15",
+                requiresApproval: true
             },
             { 
                 id: 3, 
                 name: "Rekrutmen & Pembelian", 
                 desc: "Rekrutmen H-15 sampai H-5, Pembelian H-15 sampai First Meet", 
                 fullStatus: "Tahap 3: Rekrutmen & Pembelian",
-                deadline: "H-15 sampai H-5"
+                deadline: "H-15 sampai H-5",
+                requiresApproval: false
             },
             { 
                 id: 4, 
                 name: "First Meet", 
                 desc: "H-3", 
                 fullStatus: "Tahap 4: First Meet",
-                deadline: "H-3"
+                deadline: "H-3",
+                requiresApproval: false
             },
             { 
                 id: 5, 
                 name: "Kegiatan", 
                 desc: "H-0", 
                 fullStatus: "Tahap 5: Kegiatan",
-                deadline: "H-0"
+                deadline: "H-0",
+                requiresApproval: false
             },
             { 
                 id: 6, 
                 name: "Laporan", 
                 desc: "Paling telat H+2", 
                 fullStatus: "Tahap 6: Laporan",
-                deadline: "H+2"
+                deadline: "H+2",
+                requiresApproval: true
             }
         ];
 
+        // Finance Status Options
+        const FINANCE_STATUS = {
+            PENDING: 'Belum Diajukan',
+            SUBMITTED: 'Diajukan',
+            ACCEPTED: 'Diterima',
+            REJECTED: 'Ditolak'
+        };
+
+        // Approval Status Options
+        const APPROVAL_STATUS = {
+            PENDING: 'pending',
+            SUBMITTED: 'submitted',
+            APPROVED: 'approved',
+            REJECTED: 'rejected'
+        };
+
         const app = {
+            currentUser: null,
             currentPage: 'projects',
             activeProjectId: null,
             activeStepTab: 1, 
             projects: [],
             regions: [],
             filterRegion: 'all',
+            projectFilterRegion: 'all',
+            projectApprovals: {},
+            isLoading: false,
             
             init: async () => {
-                await app.fetchRegions();
-                await app.fetchProjects();
-                app.showPage('projects');
-                document.getElementById('form-project').addEventListener('submit', async (e) => {
-                    e.preventDefault(); await app.handleFormSubmit(e.target, 'projects', app.fetchProjects);
+                console.log('App initializing...');
+                
+                // Check if admin is already logged in
+                const savedUser = localStorage.getItem('sankara_admin');
+                if (savedUser) {
+                    try {
+                        app.currentUser = JSON.parse(savedUser);
+                        await app.updateUIForAdmin();
+                    } catch (e) {
+                        console.error('Error parsing saved user:', e);
+                        await app.updateUIForGuest();
+                    }
+                } else {
+                    await app.updateUIForGuest();
+                }
+                
+                // Setup login form
+                document.getElementById('login-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await app.handleLogin();
                 });
+                
+                // Setup project form
+                document.getElementById('form-project').addEventListener('submit', async (e) => {
+                    e.preventDefault(); 
+                    await app.handleFormSubmit(e.target, 'projects', app.fetchProjects);
+                });
+                
+                // Load initial data
+                try {
+                    await app.fetchRegions();
+                    await app.fetchProjects();
+                    // Show default page after data is loaded
+                    await app.showPage('projects');
+                } catch (error) {
+                    console.error('Error during initialization:', error);
+                    app.showToast('Error memuat data awal');
+                }
+            },
+
+            updateUIForGuest: () => {
+                console.log('Setting up guest mode UI');
+                // Set guest mode UI
+                document.getElementById('user-name').textContent = 'Guest User';
+                document.getElementById('user-email').textContent = 'Mode Tamu';
+                document.getElementById('user-role').textContent = 'Guest';
+                document.getElementById('user-regional').textContent = 'All Regional';
+                document.getElementById('header-user-name').textContent = 'Guest Mode';
+                
+                // Show login buttons, hide logout buttons
+                document.getElementById('login-button').classList.remove('hidden');
+                document.getElementById('logout-button').classList.add('hidden');
+                document.getElementById('header-login-button').classList.remove('hidden');
+                document.getElementById('header-logout-button').classList.add('hidden');
+                
+                // Hide admin menu and badge
+                document.getElementById('admin-menu').classList.add('hidden');
+                document.getElementById('admin-badge').classList.add('hidden');
+            },
+
+            updateUIForAdmin: () => {
+                if (!app.currentUser) return;
+                console.log('Setting up admin mode UI for:', app.currentUser.name);
+                
+                // Set admin UI
+                document.getElementById('user-name').textContent = app.currentUser.name;
+                document.getElementById('user-email').textContent = app.currentUser.email;
+                document.getElementById('user-role').textContent = 'Admin';
+                document.getElementById('user-regional').textContent = app.currentUser.regional;
+                document.getElementById('header-user-name').textContent = app.currentUser.name;
+                
+                // Show logout buttons, hide login buttons
+                document.getElementById('login-button').classList.add('hidden');
+                document.getElementById('logout-button').classList.remove('hidden');
+                document.getElementById('header-login-button').classList.add('hidden');
+                document.getElementById('header-logout-button').classList.remove('hidden');
+                
+                // Show admin menu and badge
+                document.getElementById('admin-menu').classList.remove('hidden');
+                document.getElementById('admin-badge').classList.remove('hidden');
+            },
+
+            handleLogin: async () => {
+                if (app.isLoading) return;
+                
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                if (!email || !password) {
+                    app.showToast("Email dan password harus diisi");
+                    return;
+                }
+
+                app.isLoading = true;
+                const submitBtn = document.querySelector('#login-form button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.innerHTML = '<div class="loading-spinner mx-auto"></div>';
+                submitBtn.disabled = true;
+                
+                try {
+                    // Simple authentication
+                    const { data: users, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('email', email)
+                        .eq('password', password)
+                        .single();
+                    
+                    if (error || !users) {
+                        app.showToast("Email atau password admin salah");
+                        return;
+                    }
+                    
+                    if (users.role !== 'admin') {
+                        app.showToast("Hanya admin yang dapat login");
+                        return;
+                    }
+                    
+                    app.currentUser = users;
+                    localStorage.setItem('sankara_admin', JSON.stringify(users));
+                    await app.updateUIForAdmin();
+                    app.toggleModal('login-modal');
+                    app.showToast(`Selamat datang, Admin ${users.name}!`);
+                    
+                    // Clear login form
+                    document.getElementById('login-form').reset();
+                    
+                    // Refresh current page to show admin features
+                    app.showPage(app.currentPage);
+                    
+                } catch (error) {
+                    console.error('Login error:', error);
+                    app.showToast("Terjadi error saat login");
+                } finally {
+                    app.isLoading = false;
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            },
+
+            logout: () => {
+                localStorage.removeItem('sankara_admin');
+                app.currentUser = null;
+                app.updateUIForGuest();
+                app.showToast("Anda telah logout dari mode admin");
+                
+                // Refresh current page to hide admin features
+                app.showPage(app.currentPage);
+            },
+
+            // Check if user has permission for action
+            hasPermission: (action) => {
+                if (!app.currentUser) return false;
+                return app.currentUser.role === 'admin';
             },
 
             fetchRegions: async () => {
-                const { data, error } = await supabase.from('regions').select('*').order('name');
-                if (error) {
-                    console.error("Error fetching regions:", error);
-                    // Fallback to default regions if table doesn't exist
-                    app.regions = [
-                        { id: 1, name: 'Bandung' },
-                        { id: 2, name: 'Jakarta' },
-                        { id: 3, name: 'Surabaya' },
-                        { id: 4, name: 'Yogyakarta' }
-                    ];
-                } else {
-                    app.regions = data;
+                try {
+                    const { data, error } = await supabase.from('regions').select('*').order('name');
+                    if (error) {
+                        console.error("Error fetching regions:", error);
+                        // Fallback to default regions
+                        app.regions = [
+                            { id: 1, name: 'Bandung' },
+                            { id: 2, name: 'Jakarta' },
+                            { id: 3, name: 'Surabaya' },
+                            { id: 4, name: 'Yogyakarta' }
+                        ];
+                    } else {
+                        app.regions = data || [];
+                        console.log('Regions loaded:', app.regions.length);
+                    }
+                    
+                    // Update regional select dropdown
+                    const select = document.getElementById('regional-select');
+                    if (select) {
+                        select.innerHTML = '<option value="">Pilih Regional</option>' + 
+                            app.regions.map(region => 
+                                `<option value="${region.name}">${region.name}</option>`
+                            ).join('');
+                    }
+                } catch (error) {
+                    console.error('Error in fetchRegions:', error);
+                    app.regions = [];
                 }
-                
-                // Update regional select dropdown
-                const select = document.getElementById('regional-select');
-                if (select) {
-                    select.innerHTML = '<option value="">Pilih Regional</option>' + 
-                        app.regions.map(region => 
-                            `<option value="${region.name}">${region.name}</option>`
-                        ).join('');
-                }
-            },
-
-            addRegion: async (name) => {
-                if (!name || name.trim() === '') return;
-                
-                // Check if region already exists
-                if (app.regions.some(region => region.name.toLowerCase() === name.toLowerCase())) {
-                    app.showToast("Regional sudah ada!");
-                    return;
-                }
-                
-                const { data, error } = await supabase.from('regions').insert([{ name }]).select();
-                
-                if (error) {
-                    console.error("Error adding region:", error);
-                    app.showToast("Gagal menambah regional");
-                } else {
-                    app.regions.push(data[0]);
-                    app.showToast("Regional berhasil ditambah");
-                    app.fetchRegions(); // Refresh the dropdown
-                }
-            },
-
-            showPage: (pageName) => {
-                app.currentPage = pageName;
-                const container = document.getElementById('content-area');
-                if (pageName === 'dashboard') app.renderDashboard(container);
-                else if (pageName === 'projects') { app.activeProjectId = null; app.renderProjectList(container); }
             },
 
             fetchProjects: async () => {
-                const { data, error } = await supabase.from('projects').select('*').order('event_date', { ascending: true });
-                if (error) return app.showToast("Error DB: " + error.message);
-                app.projects = data;
-                if (app.currentPage === 'projects') app.renderProjectList(document.getElementById('content-area'));
-                else if (app.currentPage === 'dashboard') app.renderDashboard(document.getElementById('content-area'));
+                try {
+                    console.log('Fetching projects...');
+                    const { data, error } = await supabase.from('projects').select('*').order('event_date', { ascending: true });
+                    if (error) {
+                        console.error("Error DB: " + error.message);
+                        app.projects = [];
+                        return;
+                    }
+                    app.projects = data || [];
+                    console.log('Projects loaded:', app.projects.length);
+                } catch (error) {
+                    console.error('Error in fetchProjects:', error);
+                    app.projects = [];
+                }
             },
 
-            getProjectDetails: async (id, stepOverride = null) => {
-                app.activeProjectId = id;
-                app.currentPage = 'detail';
-                
-                const [proj, rundowns, budgets, volunteers, files] = await Promise.all([
-                    supabase.from('projects').select('*').eq('id', id).single(),
-                    supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', {ascending: true}),
-                    supabase.from('budgets').select('*').eq('project_id', id),
-                    supabase.from('volunteers').select('*').eq('project_id', id),
-                    supabase.from('project_files').select('*').eq('project_id', id)
-                ]);
+            fetchProjectApprovals: async (projectId) => {
+                try {
+                    const { data, error } = await supabase
+                        .from('project_approvals')
+                        .select('*')
+                        .eq('project_id', projectId)
+                        .order('step_number');
+                    
+                    if (error) {
+                        console.error("Error fetching project approvals:", error);
+                        return [];
+                    }
+                    return data || [];
+                } catch (error) {
+                    console.error('Error in fetchProjectApprovals:', error);
+                    return [];
+                }
+            },
 
-                if (!proj.data) { 
-                    app.showToast("Data proyek tidak ditemukan (mungkin sudah dihapus)."); 
+            getProjectDetails: async (projectId, stepId = 1) => {
+                if (app.isLoading) return;
+                
+                app.isLoading = true;
+                app.activeProjectId = projectId;
+                app.activeStepTab = stepId || 1;
+
+                try {
+                    console.log('Fetching project details for:', projectId);
+                    
+                    // Get project data
+                    const { data: project, error: projectError } = await supabase
+                        .from('projects')
+                        .select('*')
+                        .eq('id', projectId)
+                        .single();
+
+                    if (projectError) {
+                        throw new Error('Project not found: ' + projectError.message);
+                    }
+
+                    // Get related data
+                    const [rundowns, budgets, volunteers, files, approvals] = await Promise.all([
+                        // Rundowns
+                        supabase.from('rundowns').select('*').eq('project_id', projectId),
+                        // Budgets
+                        supabase.from('budgets').select('*').eq('project_id', projectId),
+                        // Volunteers
+                        supabase.from('volunteers').select('*').eq('project_id', projectId),
+                        // Files
+                        supabase.from('project_files').select('*').eq('project_id', projectId),
+                        // Approvals
+                        app.fetchProjectApprovals(projectId)
+                    ]);
+
+                    // Store approvals
+                    app.projectApprovals[projectId] = approvals;
+
+                    // Determine current status step
+                    let currentStatusStep = 1;
+                    const status = project.status || 'Tahap 1: Submit Proposal';
+                    const stepMatch = status.match(/Tahap (\d+)/);
+                    if (stepMatch) {
+                        currentStatusStep = parseInt(stepMatch[1]);
+                    }
+
+                    // Render the detail view
+                    app.renderProjectDetailView(
+                        project,
+                        rundowns.data || [],
+                        budgets.data || [],
+                        volunteers.data || [],
+                        files.data || [],
+                        currentStatusStep
+                    );
+
+                } catch (error) {
+                    console.error('Error fetching project details:', error);
+                    app.showToast('Error memuat detail proyek: ' + error.message);
+                    
+                    // Fallback: kembali ke list
                     app.showPage('projects');
-                    return; 
+                } finally {
+                    app.isLoading = false;
                 }
-                
-                let currentStatusStep = 1;
-                if (proj.data.status && proj.data.status.includes('Tahap')) {
-                    currentStatusStep = parseInt(proj.data.status.split(':')[0].replace('Tahap ', ''));
-                }
-                
-                app.activeStepTab = stepOverride || currentStatusStep;
-
-                app.renderProjectDetailView(proj.data, rundowns.data||[], budgets.data||[], volunteers.data||[], files.data||[], currentStatusStep);
             },
 
+            isPreviousStepApproved: (projectId, currentStep) => {
+                if (currentStep <= 1) return true;
+                
+                const approvals = app.projectApprovals[projectId] || [];
+                const previousStep = currentStep - 1;
+                const previousApproval = approvals.find(a => a.step_number === previousStep);
+                
+                const previousStepRequiresApproval = SOP_STEPS.find(s => s.id === previousStep)?.requiresApproval;
+                if (previousStepRequiresApproval) {
+                    return previousApproval && previousApproval.status === APPROVAL_STATUS.APPROVED;
+                }
+                
+                return true;
+            },
+
+            getStepStatus: (projectId, stepNumber) => {
+                const approvals = app.projectApprovals[projectId] || [];
+                const stepApproval = approvals.find(a => a.step_number === stepNumber);
+                return stepApproval ? stepApproval.status : APPROVAL_STATUS.PENDING;
+            },
+
+            submitStepForApproval: async (projectId, stepNumber) => {
+                try {
+                    const { error } = await supabase
+                        .from('project_approvals')
+                        .upsert([
+                            {
+                                project_id: projectId,
+                                step_number: stepNumber,
+                                status: APPROVAL_STATUS.SUBMITTED,
+                                submitted_at: new Date().toISOString()
+                            }
+                        ]);
+                    
+                    if (error) {
+                        app.showToast("Gagal mengajukan step untuk approval: " + error.message);
+                    } else {
+                        app.showToast("Step berhasil diajukan untuk approval");
+                        app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
+                        app.getProjectDetails(projectId, stepNumber);
+                    }
+                } catch (error) {
+                    console.error('Error in submitStepForApproval:', error);
+                    app.showToast("Terjadi error saat mengajukan approval");
+                }
+            },
+
+            updateStepApproval: async (projectId, stepNumber, newStatus, notes = '') => {
+                if (!app.hasPermission('approve_project')) {
+                    app.showToast("Hanya admin yang dapat menyetujui proyek");
+                    return;
+                }
+
+                try {
+                    const { error } = await supabase
+                        .from('project_approvals')
+                        .upsert([
+                            {
+                                project_id: projectId,
+                                step_number: stepNumber,
+                                status: newStatus,
+                                approved_at: newStatus === APPROVAL_STATUS.APPROVED ? new Date().toISOString() : null,
+                                notes: notes
+                            }
+                        ]);
+                    
+                    if (error) {
+                        app.showToast("Gagal update approval: " + error.message);
+                    } else {
+                        app.showToast(`Step berhasil ${newStatus === APPROVAL_STATUS.APPROVED ? 'disetujui' : 'ditolak'}`);
+                        app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
+                        app.getProjectDetails(projectId, stepNumber);
+                    }
+                } catch (error) {
+                    console.error('Error in updateStepApproval:', error);
+                    app.showToast("Terjadi error saat update approval");
+                }
+            },
+
+            showPage: async (pageName) => {
+                if (app.isLoading) return;
+                
+                console.log('Showing page:', pageName);
+                
+                if (pageName === 'approvals' && !app.hasPermission('manage_users')) {
+                    app.showToast("Hanya admin yang dapat mengakses halaman approval");
+                    return;
+                }
+
+                if (pageName === 'users' && !app.hasPermission('manage_users')) {
+                    app.showToast("Hanya admin yang dapat mengakses halaman user management");
+                    return;
+                }
+
+                const container = document.getElementById('content-area');
+                if (!container) {
+                    console.error('Content area not found!');
+                    return;
+                }
+
+                app.updateSidebarActiveState(pageName);
+                
+                // Show loading
+                container.innerHTML = `
+                    <div class="flex flex-col justify-center items-center h-full text-slate-400">
+                        <div class="loading-spinner mb-3"></div>
+                        <span class="text-sm font-medium">Memuat ${pageName === 'dashboard' ? 'Dashboard' : pageName === 'projects' ? 'Proyek' : pageName}...</span>
+                    </div>
+                `;
+                
+                app.currentPage = pageName;
+                
+                try {
+                    // Small delay to show loading state
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    if (pageName === 'dashboard') {
+                        await app.renderDashboard(container);
+                    } else if (pageName === 'projects') { 
+                        app.activeProjectId = null; 
+                        await app.renderProjectList(container); 
+                    } else if (pageName === 'approvals') {
+                        await app.renderApprovalsPage(container);
+                    } else if (pageName === 'users') {
+                        await app.renderUsersPage(container);
+                    }
+                } catch (error) {
+                    console.error('Error rendering page:', error);
+                    container.innerHTML = `
+                        <div class="flex flex-col justify-center items-center h-full text-red-600">
+                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                            <p class="text-lg font-bold">Terjadi Error</p>
+                            <p class="text-sm mt-2">Gagal memuat halaman: ${error.message}</p>
+                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
+                                Kembali ke Proyek
+                            </button>
+                        </div>
+                    `;
+                }
+            },
+
+            // PERBAIKAN: Fungsi renderProjectDetailView yang lengkap
             renderProjectDetailView: (project, rundowns, budgets, volunteers, files, currentStatusStep) => {
                 const container = document.getElementById('content-area');
-                let stepContent = '';
+                if (!container) return;
+
+                // Cek apakah step saat ini bisa diakses
+                const canAccessCurrentStep = app.isPreviousStepApproved(project.id, app.activeStepTab);
+                const currentStepStatus = app.getStepStatus(project.id, app.activeStepTab);
                 
+                let stepContent = '';
+                let validationError = '';
+                
+                if (!canAccessCurrentStep) {
+                    validationError = `
+                        <div class="validation-error">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                <span class="font-bold">Step ini belum bisa diakses!</span>
+                            </div>
+                            <p class="text-sm mt-1">Step sebelumnya belum disetujui. Silakan selesaikan dan ajukan step sebelumnya terlebih dahulu.</p>
+                        </div>
+                    `;
+                }
+                
+                // Step 1: Submit Proposal
                 if(app.activeStepTab === 1) {
+                    const stepStatus = app.getStepStatus(project.id, 1);
+                    
                     stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-2 text-purple-700">Tahap 1: Submit Proposal</h3>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-lg text-purple-700">Tahap 1: Submit Proposal</h3>
+                                <span class="status-badge ${app.getApprovalStatusClass(stepStatus)}">${app.getApprovalStatusText(stepStatus)}</span>
+                            </div>
                             <div class="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
                                 <div class="flex items-center text-sm text-purple-800">
                                     <i class="fas fa-clock mr-2"></i>
@@ -303,14 +823,54 @@
                             <div class="space-y-4">
                                 <div><label class="block text-sm font-bold text-slate-700 mb-1">Target Panti/Fasilitas</label><input type="text" id="inp-target" value="${project.target_audience || ''}" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Nama, Alamat..."></div>
                                 <div><label class="block text-sm font-bold text-slate-700 mb-1">Konsep Acara</label><textarea id="inp-concept" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Jelaskan konsep...">${project.concept_note || ''}</textarea></div>
-                                ${currentStatusStep === 1 ? `<button onclick="app.saveAndNext('${project.id}', 2, {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : `<button onclick="app.updateMultiField('${project.id}', {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="text-xs bg-purple-100 text-purple-700 px-4 py-2 rounded-lg font-bold">Update Data</button>`}
+                                
+                                ${stepStatus === APPROVAL_STATUS.PENDING ? `
+                                    <button onclick="app.submitStepForApproval('${project.id}', 1)" class="w-full mt-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
+                                        Ajukan untuk Approval <i class="fas fa-paper-plane ml-2"></i>
+                                    </button>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.SUBMITTED ? `
+                                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                        <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval</h4>
+                                        <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan.</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.REJECTED ? `
+                                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                                        <h4 class="font-bold text-red-800 mb-2">Ditolak</h4>
+                                        <p class="text-sm text-red-700">Step ini ditolak. Silakan perbaiki dan ajukan kembali.</p>
+                                        <button onclick="app.submitStepForApproval('${project.id}', 1)" class="mt-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                            Ajukan Ulang
+                                        </button>
+                                    </div>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep === 1 ? `
+                                    <button onclick="app.saveAndNext('${project.id}', 2, {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
+                                        Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
+                                    </button>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep > 1 ? `
+                                    <button onclick="app.updateMultiField('${project.id}', {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="text-xs bg-purple-100 text-purple-700 px-4 py-2 rounded-lg font-bold">Update Data</button>
+                                ` : ''}
                             </div>
                         </div>`;
-                } else if(app.activeStepTab === 2) {
-                    const totalBudget = budgets.reduce((sum, b) => sum + (b.total_price || 0), 0);
+                } 
+                // Step 2: Media & Finance
+                else if(app.activeStepTab === 2) {
+                    const totalBudget = budgets.reduce((sum, b) => sum + (parseFloat(b.total_price) || 0), 0);
+                    const financeStatus = project.finance_status || FINANCE_STATUS.PENDING;
+                    const stepStatus = app.getStepStatus(project.id, 2);
+                    
                     stepContent = `
                          <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-2 text-blue-700">Tahap 2: Media & Finance</h3>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-lg text-blue-700">Tahap 2: Media & Finance</h3>
+                                <span class="status-badge ${app.getApprovalStatusClass(stepStatus)}">${app.getApprovalStatusText(stepStatus)}</span>
+                            </div>
                             <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                                 <div class="flex items-center text-sm text-blue-800">
                                     <i class="fas fa-clock mr-2"></i>
@@ -319,22 +879,114 @@
                             </div>
                             <div class="mb-8">
                                 <div class="flex justify-between items-center mb-3"><h4 class="font-bold text-slate-800">RAB</h4><button onclick="app.openBudgetModal()" class="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100">+ Tambah</button></div>
-                                <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-slate-100 font-bold"><tr><th class="p-3">Item</th><th class="p-3 text-right">Total</th></tr></thead><tbody class="divide-y divide-slate-200">${budgets.map(b => `<tr><td class="p-3"><div>${b.item_name}</div><div class="text-xs text-slate-400">${b.quantity} x ${(b.unit_price/1000)}k</div></td><td class="p-3 text-right font-bold">${app.formatCurrency(b.total_price)}</td></tr>`).join('')}</tbody><tfoot class="border-t"><tr><td class="p-3 font-bold">Total RAB</td><td class="p-3 text-right font-bold text-blue-700">${app.formatCurrency(totalBudget)}</td></tr></tfoot></table></div>
+                                <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                    <table class="w-full text-sm text-left">
+                                        <thead class="bg-slate-100 font-bold">
+                                            <tr>
+                                                <th class="p-3">Item</th>
+                                                <th class="p-3 text-right">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200">
+                                            ${budgets.map(b => `
+                                                <tr>
+                                                    <td class="p-3">
+                                                        <div>${b.item_name || ''}</div>
+                                                        <div class="text-xs text-slate-400">${b.quantity || 0} x ${app.formatCurrency((parseFloat(b.unit_price) || 0) / 1000)}k</div>
+                                                    </td>
+                                                    <td class="p-3 text-right font-bold">${app.formatCurrency(parseFloat(b.total_price) || 0)}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot class="border-t">
+                                            <tr>
+                                                <td class="p-3 font-bold">Total RAB</td>
+                                                <td class="p-3 text-right font-bold text-blue-700">${app.formatCurrency(totalBudget)}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
                             </div>
                             <div class="mb-4">
                                 <div class="flex justify-between items-center mb-3"><h4 class="font-bold text-slate-800">Rundown</h4><button onclick="app.openRundownModal()" class="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100">+ Tambah</button></div>
-                                <div class="space-y-2 border-l-2 border-slate-200 ml-2 pl-4">${rundowns.map(r => `<div class="text-sm"><span class="font-bold bg-slate-100 px-1 rounded">${r.time_start}-${r.time_end}</span> ${r.activity}</div>`).join('')}</div>
+                                <div class="space-y-2 border-l-2 border-slate-200 ml-2 pl-4">
+                                    ${rundowns.map(r => `
+                                        <div class="text-sm">
+                                            <span class="font-bold bg-slate-100 px-1 rounded">${r.time_start || ''}-${r.time_end || ''}</span> 
+                                            ${r.activity || ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
                             <div class="p-4 bg-pink-50 border border-pink-100 rounded-xl">
                                 <h4 class="font-bold text-pink-800 mb-2">Publikasi Media</h4>
-                                <div class="mb-2"><label class="block text-xs font-bold text-slate-600 mb-1">Link Poster</label><input type="text" id="inp-poster" value="${project.poster_link || ''}" class="w-full border rounded px-3 py-2 bg-white"></div>
+                                <div class="mb-2">
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Link Poster</label>
+                                    <input type="text" id="inp-poster" value="${project.poster_link || ''}" class="w-full border rounded px-3 py-2 bg-white">
+                                </div>
                                 <button onclick="app.updateField('${project.id}', 'poster_link', document.getElementById('inp-poster').value)" class="text-xs bg-pink-200 text-pink-800 px-3 py-1 rounded font-bold">Simpan Link</button>
                             </div>
-                            <div class="p-4 bg-yellow-50 border border-yellow-100 rounded-xl mt-4"><h4 class="font-bold text-yellow-800 mb-2">Keuangan</h4><div class="flex items-center gap-2"><span class="text-sm font-bold">Status:</span><span class="px-2 py-1 rounded bg-white border text-xs font-bold">${project.finance_status || 'Pending'}</span></div><button onclick="app.updateField('${project.id}', 'finance_status', 'Cair')" class="mt-2 text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold border border-green-200">Set Dana Cair</button></div>
-                             ${currentStatusStep === 2 ? `<button onclick="app.saveAndNext('${project.id}', 3, {poster_link: document.getElementById('inp-poster').value})" class="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : ''}
+                            <div class="p-4 bg-yellow-50 border border-yellow-100 rounded-xl mt-4">
+                                <h4 class="font-bold text-yellow-800 mb-2">Keuangan</h4>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <span class="text-sm font-bold">Status:</span>
+                                    <span class="status-badge ${app.getFinanceStatusClass(financeStatus)}">${financeStatus}</span>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    ${financeStatus === FINANCE_STATUS.PENDING ? `
+                                        <button onclick="app.updateFinanceStatus('${project.id}', '${FINANCE_STATUS.SUBMITTED}')" class="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded font-bold border border-blue-200 hover:bg-blue-200 transition">
+                                            Ajukan Dana
+                                        </button>
+                                    ` : ''}
+                                    
+                                    ${financeStatus === FINANCE_STATUS.SUBMITTED ? `
+                                        <button onclick="app.updateFinanceStatus('${project.id}', '${FINANCE_STATUS.ACCEPTED}')" class="text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold border border-green-200 hover:bg-green-200 transition">
+                                            Terima Pengajuan
+                                        </button>
+                                        <button onclick="app.updateFinanceStatus('${project.id}', '${FINANCE_STATUS.REJECTED}')" class="text-xs bg-red-100 text-red-800 px-3 py-1 rounded font-bold border border-red-200 hover:bg-red-200 transition">
+                                            Tolak Pengajuan
+                                        </button>
+                                    ` : ''}
+                                    
+                                    <button onclick="app.updateFinanceStatus('${project.id}', '${FINANCE_STATUS.PENDING}')" class="text-xs bg-gray-100 text-gray-800 px-3 py-1 rounded font-bold border border-gray-200 hover:bg-gray-200 transition">
+                                        Reset Status
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            ${stepStatus === APPROVAL_STATUS.PENDING ? `
+                                <button onclick="app.submitStepForApproval('${project.id}', 2)" class="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">
+                                    Ajukan untuk Approval <i class="fas fa-paper-plane ml-2"></i>
+                                </button>
+                            ` : ''}
+                            
+                            ${stepStatus === APPROVAL_STATUS.SUBMITTED ? `
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                    <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval</h4>
+                                    <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan.</p>
+                                </div>
+                            ` : ''}
+                            
+                            ${stepStatus === APPROVAL_STATUS.REJECTED ? `
+                                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                                    <h4 class="font-bold text-red-800 mb-2">Ditolak</h4>
+                                    <p class="text-sm text-red-700">Step ini ditolak. Silakan perbaiki dan ajukan kembali.</p>
+                                    <button onclick="app.submitStepForApproval('${project.id}', 2)" class="mt-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                        Ajukan Ulang
+                                    </button>
+                                </div>
+                            ` : ''}
+                            
+                            ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep === 2 ? `
+                                <button onclick="app.saveAndNext('${project.id}', 3, {poster_link: document.getElementById('inp-poster').value})" class="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">
+                                    Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
+                                </button>
+                            ` : ''}
                         </div>`;
-                } else if(app.activeStepTab === 3) {
-                     stepContent = `
+                }
+                // Step 3: Rekrutmen & Pembelian
+                else if(app.activeStepTab === 3) {
+                    stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
                             <h3 class="font-bold text-lg mb-2 text-teal-700">Tahap 3: Rekrutmen & Pembelian</h3>
                             <div class="mb-4 p-3 bg-teal-50 rounded-lg border border-teal-100">
@@ -351,19 +1003,35 @@
                             </div>
                             <div class="mb-8">
                                 <div class="flex justify-between items-center mb-3"><h4 class="font-bold text-slate-800">Manajemen Relawan</h4><button onclick="app.openVolunteerModal()" class="text-xs bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg font-bold hover:bg-teal-100">+ Tambah Divisi</button></div>
-                                <div class="grid grid-cols-1 gap-3">${volunteers.map(v => `<div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center"><div class="font-bold text-slate-700">${v.role_name}</div><div class="text-xs bg-white border px-2 py-1 rounded-full font-bold">${v.count} Orang</div></div>`).join('')}</div>
+                                <div class="grid grid-cols-1 gap-3">
+                                    ${volunteers.map(v => `
+                                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center">
+                                            <div class="font-bold text-slate-700">${v.role_name || ''}</div>
+                                            <div class="text-xs bg-white border px-2 py-1 rounded-full font-bold">${v.count || 0} Orang</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
                             <div class="p-4 bg-orange-50 border border-orange-100 rounded-xl">
                                 <h4 class="font-bold text-orange-800 mb-2">Status Pembelian</h4>
-                                <div class="flex items-center gap-2"><span class="text-sm font-bold">Status:</span><span class="px-2 py-1 rounded bg-white border text-xs font-bold">${project.purchase_status || 'Belum Dimulai'}</span></div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-bold">Status:</span>
+                                    <span class="px-2 py-1 rounded bg-white border text-xs font-bold">${project.purchase_status || 'Belum Dimulai'}</span>
+                                </div>
                                 <div class="flex gap-2 mt-2">
                                     <button onclick="app.updateField('${project.id}', 'purchase_status', 'Dalam Proses')" class="text-xs bg-orange-200 text-orange-800 px-3 py-1 rounded font-bold">Dalam Proses</button>
                                     <button onclick="app.updateField('${project.id}', 'purchase_status', 'Selesai')" class="text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold">Selesai</button>
                                 </div>
                             </div>
-                            ${currentStatusStep === 3 ? `<button onclick="app.saveAndNext('${project.id}', 4, null)" class="w-full mt-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i></button>` : ''}
+                            ${currentStatusStep === 3 ? `
+                                <button onclick="app.saveAndNext('${project.id}', 4, null)" class="w-full mt-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">
+                                    Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
+                                </button>
+                            ` : ''}
                         </div>`;
-                } else if(app.activeStepTab === 4) {
+                }
+                // Step 4: First Meet
+                else if(app.activeStepTab === 4) {
                     stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
                             <h3 class="font-bold text-lg mb-2 text-orange-600">Tahap 4: First Meet</h3>
@@ -387,9 +1055,15 @@
                                 <textarea id="inp-firstmeet" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Tulis catatan hasil first meet...">${project.firstmeet_notes || ''}</textarea>
                                 <button onclick="app.updateField('${project.id}', 'firstmeet_notes', document.getElementById('inp-firstmeet').value)" class="mt-2 text-xs bg-orange-100 text-orange-800 px-3 py-1 rounded font-bold">Simpan Catatan</button>
                             </div>
-                            ${currentStatusStep === 4 ? `<button onclick="app.saveAndNext('${project.id}', 5, null)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">First Meet Selesai <i class="fas fa-arrow-right ml-2"></i></button>` : ''}
+                            ${currentStatusStep === 4 ? `
+                                <button onclick="app.saveAndNext('${project.id}', 5, null)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">
+                                    First Meet Selesai <i class="fas fa-arrow-right ml-2"></i>
+                                </button>
+                            ` : ''}
                         </div>`;
-                } else if(app.activeStepTab === 5) {
+                }
+                // Step 5: Kegiatan
+                else if(app.activeStepTab === 5) {
                     stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
                             <h3 class="font-bold text-lg mb-4 text-green-700">Tahap 5: Kegiatan</h3>
@@ -411,12 +1085,23 @@
                                 <textarea id="inp-eventday" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Tulis catatan pelaksanaan kegiatan...">${project.eventday_notes || ''}</textarea>
                                 <button onclick="app.updateField('${project.id}', 'eventday_notes', document.getElementById('inp-eventday').value)" class="mt-2 text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold">Simpan Catatan</button>
                             </div>
-                            ${currentStatusStep === 5 ? `<button onclick="app.saveAndNext('${project.id}', 6, null)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">Acara Selesai, Lanjut Laporan <i class="fas fa-check ml-2"></i></button>` : ''}
+                            ${currentStatusStep === 5 ? `
+                                <button onclick="app.saveAndNext('${project.id}', 6, null)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">
+                                    Acara Selesai, Lanjut Laporan <i class="fas fa-check ml-2"></i>
+                                </button>
+                            ` : ''}
                         </div>`;
-                } else if(app.activeStepTab === 6) {
+                }
+                // Step 6: Laporan
+                else if(app.activeStepTab === 6) {
+                    const stepStatus = app.getStepStatus(project.id, 6);
+                    
                     stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
-                            <h3 class="font-bold text-lg mb-2 text-slate-700">Tahap 6: Laporan</h3>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-lg text-slate-700">Tahap 6: Laporan</h3>
+                                <span class="status-badge ${app.getApprovalStatusClass(stepStatus)}">${app.getApprovalStatusText(stepStatus)}</span>
+                            </div>
                             <div class="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
                                 <div class="flex items-center text-sm text-slate-800">
                                     <i class="fas fa-clock mr-2"></i>
@@ -426,81 +1111,243 @@
                             <div class="mb-6">
                                 <label class="block text-sm font-bold text-slate-700 mb-1">Isi Laporan / Link Drive</label>
                                 <textarea id="inp-report" rows="5" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Tulis ringkasan laporan atau link drive untuk dokumentasi...">${project.report_content || ''}</textarea>
-                                ${currentStatusStep === 6 ? `<button onclick="app.updateMultiField('${project.id}', {report_content: document.getElementById('inp-report').value})" class="mt-2 text-xs bg-slate-200 text-slate-700 px-3 py-1 rounded font-bold">Simpan Laporan</button>` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.PENDING ? `
+                                    <button onclick="app.submitStepForApproval('${project.id}', 6)" class="w-full mt-4 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg shadow-slate-200 transition">
+                                        Ajukan untuk Approval <i class="fas fa-paper-plane ml-2"></i>
+                                    </button>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.SUBMITTED ? `
+                                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                        <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval</h4>
+                                        <p class="text-sm text-yellow-700">Laporan sudah diajukan dan menunggu persetujuan.</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.REJECTED ? `
+                                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                                        <h4 class="font-bold text-red-800 mb-2">Ditolak</h4>
+                                        <p class="text-sm text-red-700">Laporan ditolak. Silakan perbaiki dan ajukan kembali.</p>
+                                        <button onclick="app.submitStepForApproval('${project.id}', 6)" class="mt-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                            Ajukan Ulang
+                                        </button>
+                                    </div>
+                                ` : ''}
+                                
+                                ${stepStatus === APPROVAL_STATUS.APPROVED ? `
+                                    <div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold">
+                                        <i class="fas fa-trophy text-xl mb-2 block"></i> 
+                                        Proyek Selesai!
+                                    </div>
+                                ` : ''}
                             </div>
-                            ${currentStatusStep === 6 ? `
-                                <div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold">
-                                    <i class="fas fa-trophy text-xl mb-2 block"></i> 
-                                    Proyek Selesai!
-                                </div>
-                            ` : ''}
                         </div>`;
                 }
 
-                let html = `
-                    <div class="flex items-center gap-2 text-sm text-slate-500 mb-4">
-                        <button onclick="app.showPage('projects')" class="hover:text-green-600 transition">
-                            <i class="fas fa-arrow-left mr-1"></i> Kembali
-                        </button>
-                    </div>
-                    <div class="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-6">
-                        <div>
-                            <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">${project.regional}</span>
-                            <h1 class="text-3xl font-bold text-slate-800">${project.title}</h1>
-                            <p class="text-slate-600 text-sm mt-1">
-                                <i class="far fa-calendar mr-1"></i> ${app.formatDate(project.event_date)} 
-                                <span class="mx-2">•</span> 
-                                <i class="fas fa-map-marker-alt mr-1"></i> ${project.location}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between w-full overflow-x-auto pb-4 mb-2 custom-scrollbar space-x-2">
-                        ${SOP_STEPS.map((step, idx) => {
-                            const isActive = app.activeStepTab === step.id;
-                            const isDone = currentStatusStep > step.id;
-                            let colorClass = isActive ? 'bg-green-600 text-white shadow-md' : (isDone ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-400 border-slate-200');
-                            return `
-                                <button onclick="app.getProjectDetails('${project.id}', ${step.id})" class="flex flex-col items-center min-w-[120px] p-3 rounded-xl border transition ${colorClass}">
-                                    <div class="text-xs font-bold mb-1">Tahap ${step.id}</div>
-                                    <div class="text-[10px] whitespace-nowrap text-center">${step.name}</div>
-                                    <div class="text-[8px] mt-1 opacity-75">${step.deadline}</div>
-                                </button>`;
-                        }).join('')}
-                    </div>
-                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6 relative">
-                        <div class="absolute top-4 right-4">
-                            <button onclick="app.deleteProject('${project.id}')" class="text-slate-300 hover:text-red-500 bg-white p-2 rounded-full shadow-sm hover:shadow transition border border-slate-100" title="Hapus Proyek">
-                                <i class="fas fa-trash"></i>
+                // Render step buttons dengan status terkunci/buka
+                const stepButtons = SOP_STEPS.map((step, idx) => {
+                    const isActive = app.activeStepTab === step.id;
+                    const isDone = currentStatusStep > step.id;
+                    const canAccess = app.isPreviousStepApproved(project.id, step.id);
+                    const stepStatus = app.getStepStatus(project.id, step.id);
+                    
+                    let colorClass = '';
+                    if (isActive) {
+                        colorClass = 'bg-green-600 text-white shadow-md';
+                    } else if (isDone) {
+                        colorClass = 'bg-green-100 text-green-700 border-green-200';
+                    } else if (canAccess) {
+                        colorClass = 'bg-white text-slate-700 border-slate-200 step-unlocked';
+                    } else {
+                        colorClass = 'bg-slate-100 text-slate-400 border-slate-200 step-locked';
+                    }
+                    
+                    const statusIcon = stepStatus === APPROVAL_STATUS.APPROVED ? 'fa-check' : 
+                                     stepStatus === APPROVAL_STATUS.SUBMITTED ? 'fa-clock' : 
+                                     stepStatus === APPROVAL_STATUS.REJECTED ? 'fa-times' : 'fa-circle';
+                    
+                    const statusColor = stepStatus === APPROVAL_STATUS.APPROVED ? 'text-green-500' : 
+                                      stepStatus === APPROVAL_STATUS.SUBMITTED ? 'text-yellow-500' : 
+                                      stepStatus === APPROVAL_STATUS.REJECTED ? 'text-red-500' : 'text-slate-400';
+                    
+                    return `
+                        <button 
+                            onclick="${canAccess ? `app.getProjectDetails('${project.id}', ${step.id})` : 'return false;'}" 
+                            class="flex flex-col items-center min-w-[100px] md:min-w-[120px] p-2 md:p-3 rounded-xl border transition relative ${colorClass}"
+                            ${!canAccess ? 'disabled' : ''}
+                        >
+                            <div class="text-xs font-bold mb-1">Tahap ${step.id}</div>
+                            <div class="text-[10px] whitespace-nowrap text-center">${step.name}</div>
+                            <div class="text-[8px] mt-1 opacity-75 hidden md:block">${step.deadline}</div>
+                            <i class="fas ${statusIcon} ${statusColor} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1"></i>
+                        </button>`;
+                }).join('');
+
+                const html = `
+                    <div class="page-transition">
+                        <div class="flex items-center gap-2 text-sm text-slate-500 mb-4">
+                            <button onclick="app.showPage('projects')" class="hover:text-green-600 transition flex items-center">
+                                <i class="fas fa-arrow-left mr-1"></i> Kembali ke Daftar Proyek
                             </button>
                         </div>
-                        ${stepContent}
-                    </div>
-                    <div class="mt-6">
-                        <div class="bg-white rounded-2xl p-6 border border-slate-200">
-                            <h3 class="font-bold mb-4 text-sm uppercase text-slate-500">Timeline Global</h3>
-                            ${app.renderGanttChart(project.event_date)}
+                        <div class="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-6">
+                            <div>
+                                <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">${project.regional || 'Unknown'}</span>
+                                <h1 class="text-2xl md:text-3xl font-bold text-slate-800">${project.title || 'Untitled Project'}</h1>
+                                <p class="text-slate-600 text-sm mt-1">
+                                    <i class="far fa-calendar mr-1"></i> ${app.formatDate(project.event_date)} 
+                                    <span class="mx-2">•</span> 
+                                    <i class="fas fa-map-marker-alt mr-1"></i> ${project.location || 'Unknown Location'}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        ${validationError}
+                        
+                        <div class="flex items-center justify-between w-full overflow-x-auto pb-4 mb-2 custom-scrollbar space-x-2">
+                            ${stepButtons}
+                        </div>
+                        
+                        <div class="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 mb-6 relative">
+                            <div class="absolute top-4 right-4">
+                                <button onclick="app.deleteProject('${project.id}')" class="text-slate-300 hover:text-red-500 bg-white p-2 rounded-full shadow-sm hover:shadow transition border border-slate-100" title="Hapus Proyek">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            ${stepContent}
+                        </div>
+                        
+                        <div class="mt-6">
+                            <div class="bg-white rounded-2xl p-4 md:p-6 border border-slate-200">
+                                <h3 class="font-bold mb-4 text-sm uppercase text-slate-500">Timeline Global</h3>
+                                ${app.renderGanttChart(project.event_date)}
+                            </div>
                         </div>
                     </div>
                 `;
+                
                 container.innerHTML = html;
             },
 
+            // Helper functions untuk status
+            getApprovalStatusClass: (status) => {
+                switch(status) {
+                    case APPROVAL_STATUS.PENDING: return 'status-pending';
+                    case APPROVAL_STATUS.SUBMITTED: return 'status-submitted';
+                    case APPROVAL_STATUS.APPROVED: return 'status-approved';
+                    case APPROVAL_STATUS.REJECTED: return 'status-rejected';
+                    default: return 'status-pending';
+                }
+            },
+
+            getApprovalStatusText: (status) => {
+                switch(status) {
+                    case APPROVAL_STATUS.PENDING: return 'Belum Diajukan';
+                    case APPROVAL_STATUS.SUBMITTED: return 'Menunggu Approval';
+                    case APPROVAL_STATUS.APPROVED: return 'Disetujui';
+                    case APPROVAL_STATUS.REJECTED: return 'Ditolak';
+                    default: return 'Belum Diajukan';
+                }
+            },
+
+            getFinanceStatusClass: (status) => {
+                switch(status) {
+                    case FINANCE_STATUS.PENDING: return 'status-pending';
+                    case FINANCE_STATUS.SUBMITTED: return 'status-submitted';
+                    case FINANCE_STATUS.ACCEPTED: return 'status-approved';
+                    case FINANCE_STATUS.REJECTED: return 'status-rejected';
+                    default: return 'status-pending';
+                }
+            },
+
+            // Fungsi-fungsi pendukung
             updateField: async (id, field, value) => {
-                const { error } = await supabase.from('projects').update({ [field]: value }).eq('id', id);
-                if(error) app.showToast("Gagal update"); else app.showToast("Disimpan!");
+                try {
+                    const { error } = await supabase.from('projects').update({ [field]: value }).eq('id', id);
+                    if (error) {
+                        app.showToast("Gagal update: " + error.message);
+                    } else {
+                        app.showToast("Data berhasil disimpan!");
+                    }
+                } catch (error) {
+                    console.error('Error in updateField:', error);
+                    app.showToast("Terjadi error saat menyimpan data");
+                }
             },
+
             updateMultiField: async (id, updates) => {
-                const { error } = await supabase.from('projects').update(updates).eq('id', id);
-                if(error) app.showToast("Gagal update"); else app.showToast("Disimpan!");
+                try {
+                    const { error } = await supabase.from('projects').update(updates).eq('id', id);
+                    if (error) {
+                        app.showToast("Gagal update: " + error.message);
+                    } else {
+                        app.showToast("Data berhasil disimpan!");
+                    }
+                } catch (error) {
+                    console.error('Error in updateMultiField:', error);
+                    app.showToast("Terjadi error saat menyimpan data");
+                }
             },
-            
-            // --- PERBAIKAN FUNGSI DELETE PROJECT ---
+
+            updateFinanceStatus: async (projectId, newStatus) => {
+                try {
+                    const { error } = await supabase
+                        .from('projects')
+                        .update({ finance_status: newStatus })
+                        .eq('id', projectId);
+
+                    if (error) {
+                        app.showToast("Gagal mengupdate status keuangan: " + error.message);
+                    } else {
+                        app.showToast(`Status keuangan berhasil diubah menjadi: ${newStatus}`);
+                        app.getProjectDetails(projectId, 2);
+                    }
+                } catch (error) {
+                    console.error('Error in updateFinanceStatus:', error);
+                    app.showToast("Terjadi error saat update status keuangan");
+                }
+            },
+
+            saveAndNext: async (id, nextStepId, updates) => {
+                try {
+                    // Validasi: pastikan step saat ini sudah disetujui jika memerlukan approval
+                    const currentStep = SOP_STEPS.find(s => s.id === (nextStepId - 1));
+                    if (currentStep && currentStep.requiresApproval) {
+                        const currentStepStatus = app.getStepStatus(id, nextStepId - 1);
+                        if (currentStepStatus !== APPROVAL_STATUS.APPROVED) {
+                            app.showToast("Step saat ini belum disetujui. Tidak bisa lanjut ke step berikutnya.");
+                            return;
+                        }
+                    }
+                    
+                    const step = SOP_STEPS.find(s => s.id === nextStepId);
+                    if (updates) {
+                        const { error } = await supabase.from('projects').update(updates).eq('id', id);
+                        if (error) { 
+                            app.showToast("Gagal simpan data."); 
+                            return; 
+                        }
+                    }
+                    const { error } = await supabase.from('projects').update({ status: step.fullStatus }).eq('id', id);
+                    if (!error) {
+                        app.showToast("Berhasil lanjut ke Tahap " + nextStepId);
+                        app.getProjectDetails(id, nextStepId);
+                    } else {
+                        app.showToast("Error status: " + error.message);
+                    }
+                } catch (error) {
+                    console.error('Error in saveAndNext:', error);
+                    app.showToast("Terjadi error saat menyimpan dan lanjut");
+                }
+            },
+
             deleteProject: async (id) => { 
-                if(!confirm("Yakin hapus proyek ini? Semua data terkait akan dihapus permanen.")) return;
+                if (!confirm("Yakin hapus proyek ini? Semua data terkait akan dihapus permanen.")) return;
                 
                 try {
                     // Hapus data terkait terlebih dahulu
-                    const tables = ['rundowns', 'budgets', 'volunteers', 'project_files'];
+                    const tables = ['project_approvals', 'rundowns', 'budgets', 'volunteers', 'project_files'];
                     
                     for (const table of tables) {
                         const { error } = await supabase
@@ -534,279 +1381,588 @@
                 }
             },
 
-            saveAndNext: async (id, nextStepId, updates) => {
-                const step = SOP_STEPS.find(s => s.id === nextStepId);
-                if (updates) {
-                    const { error } = await supabase.from('projects').update(updates).eq('id', id);
-                    if(error) { app.showToast("Gagal simpan data."); return; }
-                }
-                const { error } = await supabase.from('projects').update({ status: step.fullStatus }).eq('id', id);
-                if(!error) {
-                    app.showToast("Berhasil lanjut ke Tahap " + nextStepId);
-                    app.getProjectDetails(id, nextStepId);
-                } else {
-                    app.showToast("Error status: " + error.message);
-                }
-            },
-
-            renderDashboard: (c) => { 
+            renderDashboard: async (container) => {
+                console.log('Rendering dashboard...');
                 const filteredProjects = app.filterRegion === 'all' 
                     ? app.projects 
                     : app.projects.filter(p => p.regional === app.filterRegion);
                     
                 const total = filteredProjects.length;
-                const done = filteredProjects.filter(p=>p.status.includes('Tahap 6')).length;
-                const inProgress = filteredProjects.filter(p=>!p.status.includes('Tahap 6')).length;
-                const regions = [...new Set(app.projects.map(p=>p.regional||'Lain'))];
+                const done = filteredProjects.filter(p => p.status && p.status.includes('Tahap 6')).length;
+                const inProgress = total - done;
+                const regions = [...new Set(app.projects.map(p => p.regional || 'Lain'))];
                 
-                c.innerHTML = `
-                    <div class="mb-8 flex justify-between items-center">
-                        <h2 class="text-2xl font-bold">Dashboard</h2>
-                        <div class="flex gap-2">
-                            <select id="region-filter" onchange="app.filterByRegion(this.value)" class="border rounded-lg px-3 py-2 text-sm">
-                                <option value="all" ${app.filterRegion === 'all' ? 'selected' : ''}>Semua Regional</option>
-                                ${regions.map(r => 
-                                    `<option value="${r}" ${app.filterRegion === r ? 'selected' : ''}>${r}</option>`
-                                ).join('')}
-                            </select>
+                container.innerHTML = `
+                    <div class="page-transition">
+                        <div class="mb-8 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                            <h2 class="text-2xl font-bold">Dashboard</h2>
+                            <div class="flex gap-2">
+                                <select id="region-filter" onchange="app.filterByRegion(this.value)" class="border rounded-lg px-3 py-2 text-sm w-full md:w-auto">
+                                    <option value="all" ${app.filterRegion === 'all' ? 'selected' : ''}>Semua Regional</option>
+                                    ${regions.map(r => 
+                                        `<option value="${r}" ${app.filterRegion === r ? 'selected' : ''}>${r}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center">
-                            <div class="text-3xl font-bold text-slate-800 mb-2">${total}</div>
-                            <div class="text-slate-600 text-sm">Total Proyek</div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                            <div class="bg-white p-4 md:p-6 rounded-xl border shadow-sm flex flex-col items-center">
+                                <div class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">${total}</div>
+                                <div class="text-slate-600 text-sm">Total Proyek</div>
+                            </div>
+                            <div class="bg-white p-4 md:p-6 rounded-xl border shadow-sm flex flex-col items-center text-green-600">
+                                <div class="text-2xl md:text-3xl font-bold mb-2">${done}</div>
+                                <div class="text-slate-600 text-sm">Selesai</div>
+                            </div>
+                            <div class="bg-white p-4 md:p-6 rounded-xl border shadow-sm flex flex-col items-center text-blue-600">
+                                <div class="text-2xl md:text-3xl font-bold mb-2">${inProgress}</div>
+                                <div class="text-slate-600 text-sm">Dalam Proses</div>
+                            </div>
                         </div>
-                        <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center text-green-600">
-                            <div class="text-3xl font-bold mb-2">${done}</div>
-                            <div class="text-slate-600 text-sm">Selesai</div>
-                        </div>
-                        <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center text-blue-600">
-                            <div class="text-3xl font-bold mb-2">${inProgress}</div>
-                            <div class="text-slate-600 text-sm">Dalam Proses</div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl border shadow-sm p-6 mb-8">
-                        <h3 class="font-bold text-lg mb-4">Gantt Chart Timeline Proyek</h3>
-                        <div class="overflow-x-auto">
-                            <div class="min-w-[600px]">
-                                <div class="flex mb-2 text-xs text-slate-500 font-medium">
-                                    <div class="w-40">Proyek</div>
-                                    <div class="flex-1 flex justify-between">
-                                        ${Array.from({length: 12}, (_, i) => {
-                                            const month = new Date(2024, i).toLocaleDateString('id-ID', {month: 'short'});
-                                            return `<div class="text-center w-1/12">${month}</div>`;
+                        
+                        ${app.projects.length > 0 ? `
+                            <div class="bg-white rounded-xl border shadow-sm p-4 md:p-6 mb-6 md:mb-8">
+                                <h3 class="font-bold text-lg mb-4">Gantt Chart Timeline Proyek</h3>
+                                <div class="overflow-x-auto">
+                                    <div class="min-w-[500px] md:min-w-[600px]">
+                                        <div class="flex mb-2 text-xs text-slate-500 font-medium">
+                                            <div class="w-32 md:w-40">Proyek</div>
+                                            <div class="flex-1 flex justify-between">
+                                                ${Array.from({length: 12}, (_, i) => {
+                                                    const month = new Date(2024, i).toLocaleDateString('id-ID', {month: 'short'});
+                                                    return `<div class="text-center w-1/12">${month}</div>`;
+                                                }).join('')}
+                                            </div>
+                                        </div>
+                                        ${filteredProjects.map(p => {
+                                            const eventDate = new Date(p.event_date);
+                                            const month = eventDate.getMonth();
+                                            const statusColor = p.status && p.status.includes('Tahap 6') ? 'bg-green-500' : 
+                                                               p.status && p.status.includes('Tahap 5') ? 'bg-blue-500' : 
+                                                               p.status && p.status.includes('Tahap 4') ? 'bg-yellow-500' : 
+                                                               p.status && p.status.includes('Tahap 3') ? 'bg-orange-500' : 
+                                                               p.status && p.status.includes('Tahap 2') ? 'bg-purple-500' : 'bg-slate-400';
+                                            
+                                            return `
+                                                <div class="flex items-center py-2 border-b border-slate-100 gantt-item">
+                                                    <div class="w-32 md:w-40 truncate font-medium text-sm" title="${p.title}">${p.title}</div>
+                                                    <div class="flex-1 relative h-6 bg-slate-50 rounded">
+                                                        <div class="absolute h-full w-3 rounded ${statusColor}" 
+                                                             style="left:${(month/12)*100}%" 
+                                                             title="${p.title} - ${app.formatDate(p.event_date)} - ${p.status}">
+                                                        </div>
+                                                    </div>
+                                                </div>`;
                                         }).join('')}
                                     </div>
                                 </div>
-                                ${filteredProjects.map(p => {
-                                    const eventDate = new Date(p.event_date);
-                                    const month = eventDate.getMonth();
-                                    const statusColor = p.status.includes('Tahap 6') ? 'bg-green-500' : 
-                                                       p.status.includes('Tahap 5') ? 'bg-blue-500' : 
-                                                       p.status.includes('Tahap 4') ? 'bg-yellow-500' : 
-                                                       p.status.includes('Tahap 3') ? 'bg-orange-500' : 
-                                                       p.status.includes('Tahap 2') ? 'bg-purple-500' : 'bg-slate-400';
+                                <div class="mt-4 text-xs text-slate-500 flex gap-2 md:gap-4 flex-wrap">
+                                    <div class="flex items-center"><div class="w-3 h-3 bg-green-500 rounded mr-1"></div> Selesai</div>
+                                    <div class="flex items-center"><div class="w-3 h-3 bg-blue-500 rounded mr-1"></div> Kegiatan</div>
+                                    <div class="flex items-center"><div class="w-3 h-3 bg-yellow-500 rounded mr-1"></div> First Meet</div>
+                                    <div class="flex items-center"><div class="w-3 h-3 bg-orange-500 rounded mr-1"></div> Rekrutmen & Pembelian</div>
+                                    <div class="flex items-center"><div class="w-3 h-3 bg-purple-500 rounded mr-1"></div> Media & Finance</div>
+                                    <div class="flex items-center"><div class="w-3 h-3 bg-slate-400 rounded mr-1"></div> Submit Proposal</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-xl border shadow-sm p-4 md:p-6">
+                                <h3 class="font-bold text-lg mb-4">Statistik per Regional</h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                    ${regions.map(region => {
+                                        const regionProjects = app.projects.filter(p => p.regional === region);
+                                        const regionDone = regionProjects.filter(p => p.status && p.status.includes('Tahap 6')).length;
+                                        const regionInProgress = regionProjects.length - regionDone;
+                                        
+                                        return `
+                                            <div class="border border-slate-200 rounded-lg p-3 md:p-4">
+                                                <div class="font-bold text-slate-800 mb-2 text-sm md:text-base">${region}</div>
+                                                <div class="text-xs md:text-sm text-slate-600">Total: ${regionProjects.length}</div>
+                                                <div class="text-xs md:text-sm text-green-600">Selesai: ${regionDone}</div>
+                                                <div class="text-xs md:text-sm text-blue-600">Proses: ${regionInProgress}</div>
+                                            </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
+                                <i class="fas fa-chart-bar text-4xl text-slate-300 mb-4"></i>
+                                <h3 class="text-lg font-bold text-slate-600 mb-2">Belum ada data proyek</h3>
+                                <p class="text-slate-500 mb-4">Mulai dengan membuat proyek pertama Anda</p>
+                                <button onclick="app.toggleModal('modal-project')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                                    Buat Proyek Pertama
+                                </button>
+                            </div>
+                        `}
+                    </div>
+                `;
+            },
+
+            renderProjectList: async (container) => {
+                console.log('Rendering project list...');
+                const filteredProjects = app.projectFilterRegion === 'all' 
+                    ? app.projects 
+                    : app.projects.filter(p => p.regional === app.projectFilterRegion);
+                
+                const regions = [...new Set(app.projects.map(p => p.regional || 'Lain'))];
+                
+                container.innerHTML = `
+                    <div class="page-transition">
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                            <h2 class="text-2xl font-bold">Manajemen Proyek</h2>
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <select id="project-region-filter" onchange="app.filterProjectsByRegion(this.value)" class="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto">
+                                    <option value="all" ${app.projectFilterRegion === 'all' ? 'selected' : ''}>Semua Regional</option>
+                                    ${regions.map(r => 
+                                        `<option value="${r}" ${app.projectFilterRegion === r ? 'selected' : ''}>${r}</option>`
+                                    ).join('')}
+                                </select>
+                                <button onclick="app.toggleModal('modal-project')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap">
+                                    + Proyek Baru
+                                </button>
+                            </div>
+                        </div>
+                        
+                        ${filteredProjects.length === 0 ? `
+                            <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
+                                <i class="fas fa-folder-open text-4xl text-slate-300 mb-4"></i>
+                                <h3 class="text-lg font-bold text-slate-600 mb-2">Tidak ada proyek</h3>
+                                <p class="text-slate-500 mb-4">${app.projectFilterRegion === 'all' ? 'Belum ada proyek yang dibuat' : `Tidak ada proyek untuk regional ${app.projectFilterRegion}`}</p>
+                                <button onclick="app.toggleModal('modal-project')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                                    Buat Proyek Pertama
+                                </button>
+                            </div>
+                        ` : `
+                            <div class="grid gap-4">
+                                ${filteredProjects.map(p => `
+                                    <div onclick="app.getProjectDetails('${p.id}')" class="bg-white p-4 md:p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition relative group">
+                                        <div class="absolute top-4 right-4 z-10">
+                                            <button onclick="event.stopPropagation(); app.deleteProject('${p.id}')" class="bg-white text-slate-400 hover:text-red-600 p-2 rounded-full shadow-sm hover:shadow transition">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
+                                            <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded self-start">${p.regional || 'Unknown'}</span>
+                                            <span class="text-xs text-slate-500">${app.formatDate(p.event_date)}</span>
+                                        </div>
+                                        <h3 class="font-bold text-lg mb-1">${p.title || 'Untitled'}</h3>
+                                        <div class="text-sm text-slate-500">${p.status || 'No status'}</div>
+                                        <div class="flex items-center gap-2 mt-3">
+                                            <div class="text-xs text-slate-400">
+                                                <i class="fas fa-user mr-1"></i>${p.leader || 'Belum ada leader'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+                `;
+            },
+
+            renderApprovalsPage: async (container) => {
+                if (!app.hasPermission('manage_users')) {
+                    container.innerHTML = `
+                        <div class="flex flex-col justify-center items-center h-full text-red-600">
+                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                            <p class="text-lg font-bold">Akses Ditolak</p>
+                            <p class="text-sm mt-2">Hanya admin yang dapat mengakses halaman ini</p>
+                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
+                                Kembali ke Proyek
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Get projects waiting for approval
+                const pendingApprovals = [];
+                for (const project of app.projects) {
+                    const approvals = await app.fetchProjectApprovals(project.id);
+                    const pendingSteps = approvals.filter(a => a.status === APPROVAL_STATUS.SUBMITTED);
+                    
+                    if (pendingSteps.length > 0) {
+                        pendingApprovals.push({
+                            project,
+                            pendingSteps
+                        });
+                    }
+                }
+
+                container.innerHTML = `
+                    <div class="page-transition">
+                        <h2 class="text-2xl font-bold mb-6">Approval Proyek</h2>
+                        
+                        ${pendingApprovals.length === 0 ? `
+                            <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
+                                <i class="fas fa-check-circle text-4xl text-green-300 mb-4"></i>
+                                <h3 class="text-lg font-bold text-slate-600 mb-2">Tidak ada approval tertunda</h3>
+                                <p class="text-slate-500">Semua proyek sudah diproses</p>
+                            </div>
+                        ` : `
+                            <div class="space-y-4">
+                                ${pendingApprovals.map(item => `
+                                    <div class="bg-white rounded-xl border shadow-sm p-6">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h3 class="font-bold text-lg">${item.project.title}</h3>
+                                                <p class="text-slate-600 text-sm">${item.project.regional} • ${app.formatDate(item.project.event_date)}</p>
+                                            </div>
+                                            <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold">
+                                                ${item.pendingSteps.length} Step Menunggu
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="space-y-3">
+                                            ${item.pendingSteps.map(step => {
+                                                const stepInfo = SOP_STEPS.find(s => s.id === step.step_number);
+                                                return `
+                                                    <div class="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
+                                                        <div>
+                                                            <h4 class="font-bold text-slate-800">${stepInfo?.name || `Step ${step.step_number}`}</h4>
+                                                            <p class="text-sm text-slate-600">${stepInfo?.desc || ''}</p>
+                                                            <p class="text-xs text-slate-500">Diajukan: ${new Date(step.submitted_at).toLocaleDateString('id-ID')}</p>
+                                                        </div>
+                                                        <div class="flex gap-2">
+                                                            <button onclick="app.updateStepApproval('${item.project.id}', ${step.step_number}, '${APPROVAL_STATUS.APPROVED}')" 
+                                                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                                                Setujui
+                                                            </button>
+                                                            <button onclick="app.openRejectModal('${item.project.id}', ${step.step_number})" 
+                                                                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                                                Tolak
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+                `;
+            },
+
+            renderUsersPage: async (container) => {
+                if (!app.hasPermission('manage_users')) {
+                    container.innerHTML = `
+                        <div class="flex flex-col justify-center items-center h-full text-red-600">
+                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                            <p class="text-lg font-bold">Akses Ditolak</p>
+                            <p class="text-sm mt-2">Hanya admin yang dapat mengakses halaman ini</p>
+                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
+                                Kembali ke Proyek
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                try {
+                    const { data: users, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .order('name');
+
+                    if (error) throw error;
+
+                    container.innerHTML = `
+                        <div class="page-transition">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-2xl font-bold">Manajemen User</h2>
+                                <button onclick="app.openUserModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                                    + Tambah User
+                                </button>
+                            </div>
+                            
+                            <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+                                <table class="w-full">
+                                    <thead class="bg-slate-50 border-b">
+                                        <tr>
+                                            <th class="text-left p-4 font-bold text-slate-700">Nama</th>
+                                            <th class="text-left p-4 font-bold text-slate-700">Email</th>
+                                            <th class="text-left p-4 font-bold text-slate-700">Role</th>
+                                            <th class="text-left p-4 font-bold text-slate-700">Regional</th>
+                                            <th class="text-left p-4 font-bold text-slate-700">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        ${users.map(user => `
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="p-4">${user.name}</td>
+                                                <td class="p-4">${user.email}</td>
+                                                <td class="p-4">
+                                                    <span class="px-2 py-1 rounded-full text-xs font-bold ${
+                                                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-800'
+                                                    }">
+                                                        ${user.role}
+                                                    </span>
+                                                </td>
+                                                <td class="p-4">${user.regional || '-'}</td>
+                                                <td class="p-4">
+                                                    <button onclick="app.editUser('${user.id}')" class="text-blue-600 hover:text-blue-800 mr-3">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button onclick="app.deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                    container.innerHTML = `
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                            <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-3"></i>
+                            <h3 class="text-lg font-bold text-red-800 mb-2">Error Memuat Data User</h3>
+                            <p class="text-red-600">${error.message}</p>
+                        </div>
+                    `;
+                }
+            },
+
+            openRejectModal: (projectId, stepNumber) => {
+                app.openGeneric(
+                    "Tolak Approval",
+                    `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleRejectApproval(this, '${projectId}', ${stepNumber})">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Alasan Penolakan</label>
+                            <textarea name="notes" placeholder="Berikan alasan penolakan..." class="w-full border p-2 rounded" rows="3" required></textarea>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="app.toggleModal('modal-generic')" class="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold">
+                                Batal
+                            </button>
+                            <button type="submit" class="flex-1 bg-red-600 text-white py-2 rounded font-bold">
+                                Tolak
+                            </button>
+                        </div>
+                    </form>`
+                );
+            },
+
+            handleRejectApproval: async (form, projectId, stepNumber) => {
+                const formData = new FormData(form);
+                const notes = formData.get('notes');
+                
+                await app.updateStepApproval(projectId, stepNumber, APPROVAL_STATUS.REJECTED, notes);
+                app.toggleModal('modal-generic');
+            },
+
+            openUserModal: () => {
+                app.openGeneric(
+                    "Tambah User Baru",
+                    `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleAddUser(this)">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Nama</label>
+                            <input type="text" name="name" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                            <input type="email" name="email" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                            <input type="password" name="password" class="w-full border p-2 rounded" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                            <select name="role" class="w-full border p-2 rounded" required>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Regional</label>
+                            <input type="text" name="regional" class="w-full border p-2 rounded">
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="app.toggleModal('modal-generic')" class="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold">
+                                Batal
+                            </button>
+                            <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded font-bold">
+                                Simpan
+                            </button>
+                        </div>
+                    </form>`
+                );
+            },
+
+            handleAddUser: async (form) => {
+                const formData = new FormData(form);
+                const userData = Object.fromEntries(formData);
+                
+                try {
+                    const { error } = await supabase
+                        .from('users')
+                        .insert([userData]);
+                    
+                    if (error) {
+                        app.showToast("Gagal menambah user: " + error.message);
+                    } else {
+                        app.showToast("User berhasil ditambahkan");
+                        app.toggleModal('modal-generic');
+                        app.showPage('users');
+                    }
+                } catch (error) {
+                    console.error('Error adding user:', error);
+                    app.showToast("Terjadi error saat menambah user");
+                }
+            },
+
+            editUser: (userId) => {
+                // Implementation for editing user
+                app.showToast("Fitur edit user belum diimplementasikan");
+            },
+
+            deleteUser: async (userId) => {
+                if (!confirm("Yakin hapus user ini?")) return;
+                
+                try {
+                    const { error } = await supabase
+                        .from('users')
+                        .delete()
+                        .eq('id', userId);
+                    
+                    if (error) {
+                        app.showToast("Gagal menghapus user: " + error.message);
+                    } else {
+                        app.showToast("User berhasil dihapus");
+                        app.showPage('users');
+                    }
+                } catch (error) {
+                    console.error('Error deleting user:', error);
+                    app.showToast("Terjadi error saat menghapus user");
+                }
+            },
+
+            renderGanttChart: (eventDate) => { 
+                if (!eventDate) return '<div class="text-slate-400 text-sm">Belum ada tanggal event</div>';
+                
+                try {
+                    const eventDay = new Date(eventDate);
+                    const milestones = [
+                        { name: "Submit Proposal", days: -18, color: "bg-slate-400" },
+                        { name: "Media & Finance", days: -15, color: "bg-purple-400" },
+                        { name: "Rekrutmen Start", days: -15, color: "bg-orange-400" },
+                        { name: "Rekrutmen End", days: -5, color: "bg-orange-500" },
+                        { name: "First Meet", days: -3, color: "bg-yellow-500" },
+                        { name: "Kegiatan (H-0)", days: 0, color: "bg-blue-500" },
+                        { name: "Laporan", days: 2, color: "bg-green-500" }
+                    ];
+                    
+                    // Calculate date range for the timeline (from H-20 to H+5)
+                    const startDate = new Date(eventDay);
+                    startDate.setDate(startDate.getDate() - 20);
+                    
+                    const endDate = new Date(eventDay);
+                    endDate.setDate(endDate.getDate() + 5);
+                    
+                    const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                    
+                    return `
+                        <div class="text-sm">
+                            <div class="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="font-bold text-slate-700 mb-2">Timeline Global Proyek</div>
+                                <div class="text-xs text-slate-600 space-y-1">
+                                    ${milestones.map(milestone => {
+                                        const milestoneDate = new Date(eventDay);
+                                        milestoneDate.setDate(milestoneDate.getDate() + milestone.days);
+                                        const dayText = milestone.days === 0 ? 'H-0' : 
+                                                       milestone.days > 0 ? `H+${milestone.days}` : 
+                                                       `H${milestone.days}`;
+                                        
+                                        return `
+                                            <div class="flex items-center timeline-milestone">
+                                                <div class="w-4 h-4 rounded-full ${milestone.color} mr-2"></div>
+                                                <div class="flex-1">${milestone.name}</div>
+                                                <div class="text-slate-500 font-medium">${dayText}</div>
+                                                <div class="ml-4 text-slate-400 hidden md:block">${milestoneDate.toLocaleDateString('id-ID')}</div>
+                                            </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="relative h-16 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+                                <!-- Timeline bar -->
+                                <div class="absolute inset-y-0 left-0 w-full flex">
+                                    ${Array.from({length: totalDays}, (_, i) => {
+                                        const currentDate = new Date(startDate);
+                                        currentDate.setDate(currentDate.getDate() + i);
+                                        const isEventDay = currentDate.toDateString() === eventDay.toDateString();
+                                        const isMilestone = milestones.some(m => {
+                                            const milestoneDate = new Date(eventDay);
+                                            milestoneDate.setDate(milestoneDate.getDate() + m.days);
+                                            return milestoneDate.toDateString() === currentDate.toDateString();
+                                        });
+                                        
+                                        let dayClass = "h-full border-r border-slate-200";
+                                        if (isEventDay) {
+                                            dayClass += " bg-blue-500";
+                                        } else if (isMilestone) {
+                                            dayClass += " bg-green-200";
+                                        } else if (currentDate < eventDay) {
+                                            dayClass += " bg-slate-200";
+                                        } else {
+                                            dayClass += " bg-slate-300";
+                                        }
+                                        
+                                        return `<div class="${dayClass}" style="width: ${100/totalDays}%"></div>`;
+                                    }).join('')}
+                                </div>
+                                
+                                <!-- Milestone markers -->
+                                ${milestones.map(milestone => {
+                                    const milestoneDate = new Date(eventDay);
+                                    milestoneDate.setDate(milestoneDate.getDate() + milestone.days);
+                                    const daysFromStart = (milestoneDate - startDate) / (1000 * 60 * 60 * 24);
+                                    const position = (daysFromStart / totalDays) * 100;
                                     
                                     return `
-                                        <div class="flex items-center py-2 border-b border-slate-100 gantt-item">
-                                            <div class="w-40 truncate font-medium text-sm" title="${p.title}">${p.title}</div>
-                                            <div class="flex-1 relative h-6 bg-slate-50 rounded">
-                                                <div class="absolute h-full w-3 rounded ${statusColor}" 
-                                                     style="left:${(month/12)*100}%" 
-                                                     title="${p.title} - ${app.formatDate(p.event_date)} - ${p.status}">
-                                                </div>
+                                        <div class="absolute top-0 transform -translate-x-1/2" style="left: ${position}%">
+                                            <div class="w-3 h-3 ${milestone.color} rounded-full border-2 border-white shadow"></div>
+                                            <div class="text-xs mt-4 text-slate-600 font-medium whitespace-nowrap hidden sm:block">
+                                                ${milestone.days === 0 ? 'H-0' : milestone.days > 0 ? `H+${milestone.days}` : `H${milestone.days}`}
                                             </div>
                                         </div>`;
                                 }).join('')}
                             </div>
-                        </div>
-                        <div class="mt-4 text-xs text-slate-500 flex gap-4 flex-wrap">
-                            <div class="flex items-center"><div class="w-3 h-3 bg-green-500 rounded mr-1"></div> Selesai</div>
-                            <div class="flex items-center"><div class="w-3 h-3 bg-blue-500 rounded mr-1"></div> Kegiatan</div>
-                            <div class="flex items-center"><div class="w-3 h-3 bg-yellow-500 rounded mr-1"></div> First Meet</div>
-                            <div class="flex items-center"><div class="w-3 h-3 bg-orange-500 rounded mr-1"></div> Rekrutmen & Pembelian</div>
-                            <div class="flex items-center"><div class="w-3 h-3 bg-purple-500 rounded mr-1"></div> Media & Finance</div>
-                            <div class="flex items-center"><div class="w-3 h-3 bg-slate-400 rounded mr-1"></div> Submit Proposal</div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl border shadow-sm p-6">
-                        <h3 class="font-bold text-lg mb-4">Statistik per Regional</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            ${regions.map(region => {
-                                const regionProjects = app.projects.filter(p => p.regional === region);
-                                const regionDone = regionProjects.filter(p => p.status.includes('Tahap 6')).length;
-                                const regionInProgress = regionProjects.length - regionDone;
-                                
-                                return `
-                                    <div class="border border-slate-200 rounded-lg p-4">
-                                        <div class="font-bold text-slate-800 mb-2">${region}</div>
-                                        <div class="text-sm text-slate-600">Total: ${regionProjects.length}</div>
-                                        <div class="text-sm text-green-600">Selesai: ${regionDone}</div>
-                                        <div class="text-sm text-blue-600">Proses: ${regionInProgress}</div>
-                                    </div>`;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            },
-            
-            filterByRegion: (region) => {
-                app.filterRegion = region;
-                app.renderDashboard(document.getElementById('content-area'));
-            },
-
-            renderProjectList: (c) => {
-                c.innerHTML = `
-                    <div class="flex justify-between mb-6">
-                        <h2 class="text-2xl font-bold">Proyek</h2>
-                        <button onclick="app.toggleModal('modal-project')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">+ Baru</button>
-                    </div>
-                    <div class="grid gap-4">
-                        ${app.projects.map(p => `
-                            <div onclick="app.getProjectDetails('${p.id}')" class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition relative group">
-                                <div class="absolute top-4 right-4 z-10">
-                                    <button onclick="event.stopPropagation(); app.deleteProject('${p.id}')" class="bg-white text-slate-400 hover:text-red-600 p-2 rounded-full shadow-sm hover:shadow transition">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                                <div class="flex justify-between mb-2">
-                                    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded">${p.regional}</span>
-                                    <span class="text-xs text-slate-500">${app.formatDate(p.event_date)}</span>
-                                </div>
-                                <h3 class="font-bold text-lg">${p.title}</h3>
-                                <div class="text-sm text-slate-500 mt-2">${p.status}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            },
-            
-            renderGanttChart: (eventDate) => { 
-                if(!eventDate) return '<div class="text-slate-400 text-sm">Belum ada tanggal event</div>';
-                
-                const eventDay = new Date(eventDate);
-                const milestones = [
-                    { name: "Submit Proposal", days: -18, color: "bg-slate-400" },
-                    { name: "Media & Finance", days: -15, color: "bg-purple-400" },
-                    { name: "Rekrutmen Start", days: -15, color: "bg-orange-400" },
-                    { name: "Rekrutmen End", days: -5, color: "bg-orange-500" },
-                    { name: "First Meet", days: -3, color: "bg-yellow-500" },
-                    { name: "Kegiatan (H-0)", days: 0, color: "bg-blue-500" },
-                    { name: "Laporan", days: 2, color: "bg-green-500" }
-                ];
-                
-                // Calculate date range for the timeline (from H-20 to H+5)
-                const startDate = new Date(eventDay);
-                startDate.setDate(startDate.getDate() - 20);
-                
-                const endDate = new Date(eventDay);
-                endDate.setDate(endDate.getDate() + 5);
-                
-                const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
-                
-                return `
-                    <div class="text-sm">
-                        <div class="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <div class="font-bold text-slate-700 mb-2">Timeline Global Proyek</div>
-                            <div class="text-xs text-slate-600 space-y-1">
-                                ${milestones.map(milestone => {
-                                    const milestoneDate = new Date(eventDay);
-                                    milestoneDate.setDate(milestoneDate.getDate() + milestone.days);
-                                    const dayText = milestone.days === 0 ? 'H-0' : 
-                                                   milestone.days > 0 ? `H+${milestone.days}` : 
-                                                   `H${milestone.days}`;
-                                    
-                                    return `
-                                        <div class="flex items-center timeline-milestone">
-                                            <div class="w-4 h-4 rounded-full ${milestone.color} mr-2"></div>
-                                            <div class="flex-1">${milestone.name}</div>
-                                            <div class="text-slate-500 font-medium">${dayText}</div>
-                                            <div class="ml-4 text-slate-400">${milestoneDate.toLocaleDateString('id-ID')}</div>
-                                        </div>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                        
-                        <div class="relative h-16 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden">
-                            <!-- Timeline bar -->
-                            <div class="absolute inset-y-0 left-0 w-full flex">
-                                ${Array.from({length: totalDays}, (_, i) => {
-                                    const currentDate = new Date(startDate);
-                                    currentDate.setDate(currentDate.getDate() + i);
-                                    const isEventDay = currentDate.toDateString() === eventDay.toDateString();
-                                    const isMilestone = milestones.some(m => {
-                                        const milestoneDate = new Date(eventDay);
-                                        milestoneDate.setDate(milestoneDate.getDate() + m.days);
-                                        return milestoneDate.toDateString() === currentDate.toDateString();
-                                    });
-                                    
-                                    let dayClass = "h-full border-r border-slate-200";
-                                    if (isEventDay) {
-                                        dayClass += " bg-blue-500";
-                                    } else if (isMilestone) {
-                                        dayClass += " bg-green-200";
-                                    } else if (currentDate < eventDay) {
-                                        dayClass += " bg-slate-200";
-                                    } else {
-                                        dayClass += " bg-slate-300";
-                                    }
-                                    
-                                    return `<div class="${dayClass}" style="width: ${100/totalDays}%"></div>`;
-                                }).join('')}
-                            </div>
                             
-                            <!-- Milestone markers -->
-                            ${milestones.map(milestone => {
-                                const milestoneDate = new Date(eventDay);
-                                milestoneDate.setDate(milestoneDate.getDate() + milestone.days);
-                                const daysFromStart = (milestoneDate - startDate) / (1000 * 60 * 60 * 24);
-                                const position = (daysFromStart / totalDays) * 100;
-                                
-                                return `
-                                    <div class="absolute top-0 transform -translate-x-1/2" style="left: ${position}%">
-                                        <div class="w-3 h-3 ${milestone.color} rounded-full border-2 border-white shadow"></div>
-                                        <div class="text-xs mt-4 text-slate-600 font-medium whitespace-nowrap">
-                                            ${milestone.days === 0 ? 'H-0' : milestone.days > 0 ? `H+${milestone.days}` : `H${milestone.days}`}
-                                        </div>
-                                    </div>`;
-                            }).join('')}
+                            <div class="flex justify-between text-xs text-slate-500 mt-2">
+                                <div>${startDate.toLocaleDateString('id-ID')}</div>
+                                <div>${endDate.toLocaleDateString('id-ID')}</div>
+                            </div>
                         </div>
-                        
-                        <div class="flex justify-between text-xs text-slate-500 mt-2">
-                            <div>${startDate.toLocaleDateString('id-ID')}</div>
-                            <div>${endDate.toLocaleDateString('id-ID')}</div>
-                        </div>
-                    </div>
-                `;
-            },
-            
-            handleFormSubmit: async (f,t,cb) => { 
-                const fd = new FormData(f); 
-                const d = Object.fromEntries(fd); 
-                delete d.id; 
-                const {error} = await supabase.from(t).insert([d]); 
-                if(!error){
-                    app.showToast("Proyek berhasil disimpan"); 
-                    app.toggleModal(f.closest('.fixed').id); 
-                    f.reset(); 
-                    cb();
-                } else {
-                    app.showToast("Error: " + error.message);
+                    `;
+                } catch (error) {
+                    console.error('Error rendering Gantt chart:', error);
+                    return '<div class="text-red-400 text-sm">Error rendering timeline</div>';
                 }
             },
-            
-            toggleModal: (id) => document.getElementById(id).classList.toggle('hidden'),
-            
+
+            // Modal functions
+            toggleModal: (id) => {
+                const modal = document.getElementById(id);
+                if (modal) {
+                    modal.classList.toggle('hidden');
+                }
+            },
+
             openGeneric: (t,h,fn) => { 
                 document.getElementById('modal-generic-title').innerText=t; 
                 document.getElementById('modal-generic-content').innerHTML=h; 
                 if(fn) document.querySelector('#modal-generic-content form').onsubmit=fn; 
                 app.toggleModal('modal-generic'); 
             },
-            
+
             openRegionalModal: () => {
                 app.openGeneric(
                     "Tambah Regional Baru", 
@@ -816,14 +1972,35 @@
                     </form>`
                 );
             },
-            
+
             handleAddRegion: async (form) => {
                 const formData = new FormData(form);
                 const regionName = formData.get('region_name');
                 await app.addRegion(regionName);
                 app.toggleModal('modal-generic');
             },
-            
+
+            addRegion: async (name) => {
+                if (!name || name.trim() === '') return;
+                
+                // Check if region already exists
+                if (app.regions.some(region => region.name.toLowerCase() === name.toLowerCase())) {
+                    app.showToast("Regional sudah ada!");
+                    return;
+                }
+                
+                const { data, error } = await supabase.from('regions').insert([{ name }]).select();
+                
+                if (error) {
+                    console.error("Error adding region:", error);
+                    app.showToast("Gagal menambah regional");
+                } else {
+                    app.regions.push(data[0]);
+                    app.showToast("Regional berhasil ditambah");
+                    app.fetchRegions(); // Refresh the dropdown
+                }
+            },
+
             openBudgetModal: () => app.openGeneric("Tambah Budget", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'budgets')"><input name="item_name" placeholder="Item" class="w-full border p-2 rounded" required><div class="flex gap-2"><input id="bq" name="quantity" placeholder="Qty" class="w-full border p-2 rounded"><input id="bp" name="unit_price" placeholder="Harga" class="w-full border p-2 rounded"></div><input id="bt" name="total_price" placeholder="Total" class="w-full border p-2 rounded bg-slate-50" readonly><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
             openVolunteerModal: () => app.openGeneric("Tambah Divisi", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'volunteers')"><input name="role_name" placeholder="Nama Divisi" class="w-full border p-2 rounded" required><input name="count" placeholder="Jumlah" class="w-full border p-2 rounded"><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
             openRundownModal: () => app.openGeneric("Tambah Rundown", `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleSubItem(this, 'rundowns')"><div class="flex gap-2"><input name="time_start" placeholder="Start" class="w-full border p-2 rounded"><input name="time_end" placeholder="End" class="w-full border p-2 rounded"></div><input name="activity" placeholder="Kegiatan" class="w-full border p-2 rounded" required><button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button></form>`),
@@ -841,35 +2018,84 @@
                     app.showToast("Error: " + error.message);
                 }
             },
-            
+
+            handleFormSubmit: async (f,t,cb) => { 
+                try {
+                    const fd = new FormData(f); 
+                    const d = Object.fromEntries(fd); 
+                    delete d.id; 
+                    const {error} = await supabase.from(t).insert([d]); 
+                    if(!error){
+                        app.showToast("Proyek berhasil disimpan"); 
+                        app.toggleModal('modal-project'); 
+                        f.reset(); 
+                        if (cb) await cb();
+                    } else {
+                        app.showToast("Error: " + error.message);
+                    }
+                } catch (error) {
+                    console.error('Error in handleFormSubmit:', error);
+                    app.showToast("Terjadi error saat menyimpan proyek");
+                }
+            },
+
             showToast: (m) => { 
                 const t = document.getElementById('toast'); 
-                document.getElementById('toast-msg').innerText = m; 
-                t.classList.remove('translate-x-full'); 
-                setTimeout(() => t.classList.add('translate-x-full'), 3000); 
+                if (t) {
+                    document.getElementById('toast-msg').textContent = m; 
+                    t.classList.remove('translate-x-full'); 
+                    setTimeout(() => t.classList.add('translate-x-full'), 3000); 
+                }
             },
-            
+
             formatDate: (s) => s ? new Date(s).toLocaleDateString('id-ID') : '-',
-            formatCurrency: (n) => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n),
-            
-            generateBandungData: async () => { 
-                if(confirm("Generate data dummy?")){ 
-                    const {data:p} = await supabase.from('projects').insert([
-                        {title:"Bandung Menyapa #3", regional:"Bandung", event_date:"2025-12-21", status:"Tahap 1: Submit Proposal"}
-                    ]).select().single(); 
-                    if(p){ 
-                        await supabase.from('budgets').insert([
-                            {project_id:p.id, item_name:"Konsumsi", total_price:500000}
-                        ]); 
-                        app.showToast("Data dummy berhasil dibuat"); 
-                        app.fetchProjects(); 
-                    } 
-                } 
+            formatCurrency: (n) => n ? new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n) : 'Rp 0',
+
+            // Filter functions
+            filterByRegion: (region) => {
+                app.filterRegion = region;
+                app.renderDashboard(document.getElementById('content-area'));
+            },
+
+            filterProjectsByRegion: (region) => {
+                app.projectFilterRegion = region;
+                app.renderProjectList(document.getElementById('content-area'));
+            },
+
+            updateSidebarActiveState: (pageName) => {
+                const buttons = ['dashboard', 'projects', 'approvals', 'users'];
+                buttons.forEach(btn => {
+                    const element = document.getElementById(`sidebar-${btn}`);
+                    if (element) {
+                        element.classList.remove('active', 'bg-green-50', 'text-green-700', 'shadow-sm', 'shadow-green-100', 'ring-1', 'ring-green-200');
+                        element.classList.add('sidebar-item', 'hover:bg-green-50', 'text-slate-600', 'hover:text-green-700');
+                    }
+                });
+                
+                const activeBtn = document.getElementById(`sidebar-${pageName}`);
+                if (activeBtn) {
+                    activeBtn.classList.add('active', 'bg-green-50', 'text-green-700', 'shadow-sm', 'shadow-green-100', 'ring-1', 'ring-green-200');
+                    activeBtn.classList.remove('hover:bg-green-50', 'text-slate-600', 'hover:text-green-700');
+                }
             }
         };
         
-        app.init();
-        
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing app...');
+            app.init().catch(error => {
+                console.error('Failed to initialize app:', error);
+            });
+        });
+
+        // Fallback initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', app.init);
+        } else {
+            app.init();
+        }
+
+        // Event listener untuk kalkulasi budget
         document.addEventListener('input', (e) => { 
             if(e.target.id === 'bq' || e.target.id === 'bp') { 
                 const q = parseFloat(document.getElementById('bq').value)||0; 
