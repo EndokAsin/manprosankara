@@ -368,6 +368,7 @@
                 name: "Submit Proposal", 
                 desc: "Paling telat H-18", 
                 fullStatus: "Tahap 1: Submit Proposal",
+                nextStatus: "Tahap 2: Media & Finance",
                 deadline: "H-18",
                 requiresApproval: true
             },
@@ -376,6 +377,7 @@
                 name: "Media & Finance", 
                 desc: "Paling telat H-15", 
                 fullStatus: "Tahap 2: Media & Finance",
+                nextStatus: "Tahap 3: Rekrutmen & Pembelian",
                 deadline: "H-15",
                 requiresApproval: true
             },
@@ -384,6 +386,7 @@
                 name: "Rekrutmen & Pembelian", 
                 desc: "Rekrutmen H-15 sampai H-5, Pembelian H-15 sampai First Meet", 
                 fullStatus: "Tahap 3: Rekrutmen & Pembelian",
+                nextStatus: "Tahap 4: First Meet",
                 deadline: "H-15 sampai H-5",
                 requiresApproval: false
             },
@@ -392,6 +395,7 @@
                 name: "First Meet", 
                 desc: "H-3", 
                 fullStatus: "Tahap 4: First Meet",
+                nextStatus: "Tahap 5: Kegiatan",
                 deadline: "H-3",
                 requiresApproval: false
             },
@@ -400,6 +404,7 @@
                 name: "Kegiatan", 
                 desc: "H-0", 
                 fullStatus: "Tahap 5: Kegiatan",
+                nextStatus: "Tahap 6: Laporan",
                 deadline: "H-0",
                 requiresApproval: false
             },
@@ -408,6 +413,7 @@
                 name: "Laporan", 
                 desc: "Paling telat H+2", 
                 fullStatus: "Tahap 6: Laporan",
+                nextStatus: "Tahap 6: Laporan - Selesai",
                 deadline: "H+2",
                 requiresApproval: true
             }
@@ -809,6 +815,7 @@
                 }
             },
 
+            // PERBAIKAN: Fungsi updateStepApproval dengan auto-update status proyek
             updateStepApproval: async (projectId, stepNumber, newStatus, notes = '') => {
                 // PERBAIKAN: Hanya cek permission untuk approve/reject, bukan untuk submit
                 if ((newStatus === APPROVAL_STATUS.APPROVED || newStatus === APPROVAL_STATUS.REJECTED) && 
@@ -845,16 +852,21 @@
                         const statusText = newStatus === APPROVAL_STATUS.APPROVED ? 'disetujui' : 
                                           newStatus === APPROVAL_STATUS.REJECTED ? 'ditolak' : 'diajukan';
                         app.showToast(`Step berhasil ${statusText}`);
-                        app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
                         
-                        // Jika step 6 disetujui, update status proyek menjadi selesai
-                        if (newStatus === APPROVAL_STATUS.APPROVED && stepNumber === 6) {
-                            await supabase
-                                .from('projects')
-                                .update({ status: 'Tahap 6: Laporan - Selesai' })
-                                .eq('id', projectId);
+                        // PERBAIKAN: Jika step disetujui, update status proyek ke step berikutnya
+                        if (newStatus === APPROVAL_STATUS.APPROVED) {
+                            const currentStep = SOP_STEPS.find(s => s.id === stepNumber);
+                            if (currentStep && currentStep.nextStatus) {
+                                await supabase
+                                    .from('projects')
+                                    .update({ status: currentStep.nextStatus })
+                                    .eq('id', projectId);
+                                
+                                app.showToast(`Proyek berhasil dipindahkan ke ${currentStep.nextStatus}`);
+                            }
                         }
                         
+                        app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
                         app.getProjectDetails(projectId, stepNumber);
                     }
                 } catch (error) {
@@ -921,7 +933,7 @@
                 }
             },
 
-            // PERBAIKAN: Fungsi renderProjectDetailView dengan permission yang benar
+            // PERBAIKAN: Fungsi renderProjectDetailView dengan tombol next step yang benar
             renderProjectDetailView: (project, rundowns, budgets, volunteers, files, currentStatusStep) => {
                 const container = document.getElementById('content-area');
                 if (!container) return;
@@ -1015,10 +1027,12 @@
                                     </div>
                                 ` : ''}
                                 
+                                <!-- PERBAIKAN: Hapus tombol save & next karena sudah otomatis -->
                                 ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep === 1 ? `
-                                    <button onclick="app.saveAndNext('${project.id}', 2)" class="w-full mt-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
-                                        Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
-                                    </button>
+                                    <div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold mb-4">
+                                        <i class="fas fa-check-circle text-xl mb-2 block"></i> 
+                                        Step 1 Disetujui! Proyek otomatis pindah ke Tahap 2.
+                                    </div>
                                 ` : ''}
                                 
                                 ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep > 1 ? `
@@ -1160,10 +1174,12 @@
                                 </div>
                             ` : ''}
                             
+                            <!-- PERBAIKAN: Hapus tombol save & next karena sudah otomatis -->
                             ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep === 2 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 3)" class="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">
-                                    Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
-                                </button>
+                                <div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold mb-4">
+                                    <i class="fas fa-check-circle text-xl mb-2 block"></i> 
+                                    Step 2 Disetujui! Proyek otomatis pindah ke Tahap 3.
+                                </div>
                             ` : ''}
                         </div>`;
                 }
@@ -1207,8 +1223,8 @@
                                 </div>
                             </div>
                             ${currentStatusStep === 3 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 4)" class="w-full mt-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">
-                                    Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
+                                <button onclick="app.manualNextStep('${project.id}', 4)" class="w-full mt-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">
+                                    Lanjut ke First Meet <i class="fas fa-arrow-right ml-2"></i>
                                 </button>
                             ` : ''}
                         </div>`;
@@ -1239,7 +1255,7 @@
                                 <button onclick="app.updateField('${project.id}', 'firstmeet_notes', document.getElementById('inp-firstmeet').value)" class="mt-2 text-xs bg-orange-100 text-orange-800 px-3 py-1 rounded font-bold">Simpan Catatan</button>
                             </div>
                             ${currentStatusStep === 4 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 5)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">
+                                <button onclick="app.manualNextStep('${project.id}', 5)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">
                                     First Meet Selesai <i class="fas fa-arrow-right ml-2"></i>
                                 </button>
                             ` : ''}
@@ -1269,7 +1285,7 @@
                                 <button onclick="app.updateField('${project.id}', 'eventday_notes', document.getElementById('inp-eventday').value)" class="mt-2 text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold">Simpan Catatan</button>
                             </div>
                             ${currentStatusStep === 5 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 6)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">
+                                <button onclick="app.manualNextStep('${project.id}', 6)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">
                                     Acara Selesai, Lanjut Laporan <i class="fas fa-check ml-2"></i>
                                 </button>
                             ` : ''}
@@ -1469,41 +1485,29 @@
                 }
             },
 
-            // PERBAIKAN: Fungsi saveAndNext yang diperbaiki
-            saveAndNext: async (id, nextStepId) => {
+            // PERBAIKAN: Fungsi untuk manual next step (untuk step yang tidak butuh approval)
+            manualNextStep: async (projectId, nextStepId) => {
                 try {
-                    // Validasi: pastikan step saat ini sudah disetujui jika memerlukan approval
-                    const currentStep = SOP_STEPS.find(s => s.id === (nextStepId - 1));
-                    if (currentStep && currentStep.requiresApproval) {
-                        const currentStepStatus = app.getStepStatus(id, nextStepId - 1);
-                        if (currentStepStatus !== APPROVAL_STATUS.APPROVED) {
-                            app.showToast("Step saat ini belum disetujui. Tidak bisa lanjut ke step berikutnya.");
-                            return;
-                        }
-                    }
-                    
                     const step = SOP_STEPS.find(s => s.id === nextStepId);
-                    
-                    // Untuk step 1, simpan data proposal terlebih dahulu
-                    if (nextStepId === 2) {
-                        await app.saveProposalData(id);
+                    if (!step) {
+                        app.showToast("Step tidak ditemukan");
+                        return;
                     }
                     
-                    // Update status proyek
                     const { error } = await supabase
                         .from('projects')
                         .update({ status: step.fullStatus })
-                        .eq('id', id);
+                        .eq('id', projectId);
                         
                     if (error) {
                         app.showToast("Error update status: " + error.message);
                     } else {
-                        app.showToast("Berhasil lanjut ke Tahap " + nextStepId);
-                        app.getProjectDetails(id, nextStepId);
+                        app.showToast("Berhasil lanjut ke " + step.fullStatus);
+                        app.getProjectDetails(projectId, nextStepId);
                     }
                 } catch (error) {
-                    console.error('Error in saveAndNext:', error);
-                    app.showToast("Terjadi error saat menyimpan dan lanjut");
+                    console.error('Error in manualNextStep:', error);
+                    app.showToast("Terjadi error saat lanjut ke step berikutnya");
                 }
             },
 
