@@ -248,14 +248,34 @@
                             </div>
                         </div>
                         <div class="grid gap-4">
-                            ${filtered.map(p => `
-                                <div onclick="UserModule.openProjectDetail('${p.id}')" class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition relative group">
-                                    <div class="flex justify-between items-start mb-2"><span class="bg-slate-800 text-white text-xs px-2 py-1 rounded">${p.regional}</span><span class="text-xs text-slate-500">${Core.formatDate(p.event_date)}</span></div>
+                            ${filtered.map(p => {
+                                // MODIFIED: Calculate pJson for edit modal
+                                const pJson = JSON.stringify({
+                                    id: p.id, 
+                                    title: p.title, 
+                                    event_date: p.event_date, 
+                                    location: p.location, 
+                                    regional: p.regional, 
+                                    leader: p.leader // Added leader
+                                }).replace(/"/g, '&quot;');
+
+                                return `
+                                <div onclick="UserModule.openProjectDetail('${p.id}')" class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition relative group flex flex-col h-full">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded">${p.regional}</span>
+                                        <span class="text-xs text-slate-500">${Core.formatDate(p.event_date)}</span>
+                                    </div>
                                     <h3 class="font-bold text-lg mb-1">${p.title}</h3>
-                                    <div class="text-sm text-slate-500 mb-2">${p.status}</div>
-                                    <button onclick="event.stopPropagation(); UserModule.deleteProject('${p.id}')" class="absolute top-4 right-4 text-slate-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
+                                    <div class="text-sm text-slate-500 mb-4">${p.status}</div>
+                                    <div class="mt-auto pt-2 flex justify-between items-center">
+                                        <div class="text-xs text-slate-400"><i class="fas fa-user mr-1"></i> ${p.leader || '-'}</div>
+                                        <div class="flex gap-2">
+                                            <button onclick="event.stopPropagation(); UserModule.openEditProjectModal(${pJson})" class="bg-white text-blue-400 hover:text-blue-600 p-2 rounded-full shadow-sm hover:shadow transition border border-slate-100" title="Edit"><i class="fas fa-pencil-alt"></i></button>
+                                            <button onclick="event.stopPropagation(); UserModule.deleteProject('${p.id}')" class="bg-white text-slate-300 hover:text-red-600 p-2 rounded-full shadow-sm hover:shadow transition border border-slate-100" title="Hapus"><i class="fas fa-trash"></i></button>
+                                        </div>
+                                    </div>
                                 </div>
-                            `).join('')}
+                            `}).join('')}
                         </div>
                     </div>`;
             },
@@ -324,7 +344,8 @@
                 }).join('');
 
                 // Prepare data for edit function
-                const pJson = JSON.stringify({id: p.id, title: p.title, event_date: p.event_date, location: p.location, regional: p.regional}).replace(/"/g, '&quot;');
+                // MODIFIED: Added leader to json
+                const pJson = JSON.stringify({id: p.id, title: p.title, event_date: p.event_date, location: p.location, regional: p.regional, leader: p.leader}).replace(/"/g, '&quot;');
 
                 container.innerHTML = `
                     <div class="fade-in pb-20">
@@ -337,7 +358,7 @@
                                         <i class="fas fa-pencil-alt"></i>
                                     </button>
                                 </h1>
-                                <p class="text-sm text-slate-500">${p.regional} • ${Core.formatDate(p.event_date)} • ${p.location || 'Lokasi belum diatur'}</p>
+                                <p class="text-sm text-slate-500">${p.regional} • ${Core.formatDate(p.event_date)} • ${p.location || 'Lokasi belum diatur'} • ${p.leader || 'Leader?'}</p>
                             </div>
                         </div>
                         
@@ -347,13 +368,16 @@
                     </div>`;
             },
 
-            // MODIFIED: Added openEditProjectModal
+            // MODIFIED: Added openEditProjectModal with LEADER
             openEditProjectModal: (p) => {
                 const html = `
                     <form onsubmit="event.preventDefault(); UserModule.updateProjectDetails(this, '${p.id}')">
                         <label class="block text-xs font-bold text-slate-500 mb-1">NAMA KEGIATAN</label>
                         <input name="title" value="${p.title}" class="w-full border p-2 rounded mb-3" required>
                         
+                        <label class="block text-xs font-bold text-slate-500 mb-1">PROJECT LEADER</label>
+                        <input name="leader" value="${p.leader || ''}" class="w-full border p-2 rounded mb-3" placeholder="Nama Leader">
+
                         <label class="block text-xs font-bold text-slate-500 mb-1">TANGGAL EVENT</label>
                         <input type="date" name="event_date" value="${p.event_date}" class="w-full border p-2 rounded mb-3" required>
                         
@@ -373,7 +397,12 @@
                 if (!error) {
                     Core.showToast('Informasi proyek diperbarui');
                     Core.toggleModal('modal-generic');
-                    UserModule.openProjectDetail(pid, UserModule.activeProjectId ? undefined : 1); // Refresh current view
+                    // If we are in list view, refresh list. If in detail view, refresh detail.
+                    if (UserModule.activeProjectId) {
+                         UserModule.openProjectDetail(pid, 1); // Just refresh, step 1 is fine or keep current
+                    } else {
+                         App.router('projects');
+                    }
                 } else {
                     Core.showToast('Gagal update: ' + error.message);
                 }
@@ -687,7 +716,11 @@
                     // Header
                     doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Sankara NGO", 105, y, null, null, 'center'); y+=10;
                     doc.setTextColor(0); doc.setFontSize(10);
-                    line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); line(`Regional: ${p.regional} | Leader: ${p.leader}`); y+=5;
+                    line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); 
+                    line(`Regional: ${p.regional} | Leader: ${p.leader}`); 
+                    // MODIFIED: Added Target Audience
+                    line(`Target Audience: ${p.target_audience || '-'}`);
+                    y+=5;
                     doc.setDrawColor(200); doc.line(15,y,195,y); y+=8;
 
                     // Konsep & Games
