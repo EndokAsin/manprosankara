@@ -44,6 +44,11 @@
         .status-rejected { @apply bg-red-100 text-red-800 border-red-200; }
         .step-locked { opacity: 0.6; cursor: not-allowed; }
         .step-unlocked { cursor: pointer; }
+        
+        /* Gantt Chart Styles */
+        .gantt-bar { transition: all 0.3s ease; }
+        .timeline-milestone { position: relative; }
+        .timeline-milestone::before { content: ''; position: absolute; left: -8px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #16a34a; }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen flex overflow-hidden">
@@ -203,7 +208,7 @@
             SOP_STEPS: [
                 { id: 1, name: "Submit Proposal", desc: "H-18", fullStatus: "Tahap 1: Submit Proposal", nextStatus: "Tahap 2: Media & Finance", requiresApproval: true },
                 { id: 2, name: "Media & Finance", desc: "H-15", fullStatus: "Tahap 2: Media & Finance", nextStatus: "Tahap 3: Rekrutmen & Pembelian", requiresApproval: true },
-                { id: 3, name: "Rekrutmen & Pembelian", desc: "H-15 s/d H-5", fullStatus: "Tahap 3: Rekrutmen & Pembelian", nextStatus: "Tahap 4: First Meet", requiresApproval: false },
+                { id: 3, name: "Rekrutmen & Pembelian", desc: "H-15 s/d H-5", fullStatus: "Tahap 3: Rekrutmen & Pembelian", nextStatus: "Tahap 4: First Meet", requiresApproval: true }, // MODIFIKASI: requiresApproval: true
                 { id: 4, name: "First Meet", desc: "H-3", fullStatus: "Tahap 4: First Meet", nextStatus: "Tahap 5: Kegiatan", requiresApproval: false },
                 { id: 5, name: "Kegiatan", desc: "H-0", fullStatus: "Tahap 5: Kegiatan", nextStatus: "Tahap 6: Laporan", requiresApproval: false },
                 { id: 6, name: "Laporan", desc: "H+2", fullStatus: "Tahap 6: Laporan", nextStatus: "Tahap 6: Laporan - Selesai", requiresApproval: true }
@@ -324,7 +329,7 @@
 
             renderDashboard: async (container) => {
                 const total = UserModule.projects.length;
-                const done = UserModule.projects.filter(p => p.status.includes('Tahap 6') && p.status.includes('Selesai')).length; // Simplified logic
+                const done = UserModule.projects.filter(p => p.status && p.status.includes('Tahap 6') && p.status.includes('Selesai')).length;
                 const progress = total - done;
 
                 container.innerHTML = `
@@ -344,9 +349,11 @@
                                 <span class="text-sm">Dalam Proses</span>
                             </div>
                         </div>
-                        <div class="bg-white rounded-xl border shadow-sm p-6">
-                            <h3 class="font-bold text-lg mb-4">Timeline Proyek (Gantt)</h3>
-                            <div class="overflow-x-auto">${UserModule.renderGanttChart()}</div>
+                        <div class="bg-white rounded-xl border shadow-sm p-6 mb-8">
+                            <h3 class="font-bold text-lg mb-4">Gantt Chart Utama</h3>
+                            <div class="overflow-x-auto">
+                                ${UserModule.renderGanttChart(UserModule.projects)}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -357,7 +364,7 @@
                     ? UserModule.projects 
                     : UserModule.projects.filter(p => p.regional === UserModule.filterRegion);
 
-                const regions = await Core.fetchRegions(); // Ensure regions loaded for filter
+                const regions = await Core.fetchRegions(); 
 
                 container.innerHTML = `
                     <div class="fade-in">
@@ -397,7 +404,6 @@
                 const container = document.getElementById('content-area');
                 container.innerHTML = '<div class="flex h-full items-center justify-center"><div class="loading-spinner"></div></div>';
                 
-                // Fetch full details
                 const { data: project } = await Core.supabase.from('projects').select('*').eq('id', id).single();
                 if(!project) return App.router('projects');
 
@@ -414,8 +420,6 @@
             },
 
             renderDetailView: (container, project, relations, activeStep) => {
-                // Determine logic for steps (Locking/Unlocking)
-                // Simply checking if previous step is approved or handled
                 const getStepStatus = (stepNum) => {
                     const app = relations.approvals.find(a => a.step_number === stepNum);
                     return app ? app.status : 'pending';
@@ -424,11 +428,21 @@
                 const stepsHtml = Core.SOP_STEPS.map(step => {
                     const status = getStepStatus(step.id);
                     const isActive = activeStep === step.id;
+                    // Logic penguncian step: User bisa klik step jika step sebelumnya 'approved' ATAU step 1 (selalu buka)
+                    // Namun untuk admin, semua step mungkin bisa dilihat. 
+                    // Disini kita buat sederhana: step sebelumnya harus approved untuk akses step berikutnya.
+                    
                     let color = isActive ? 'bg-green-600 text-white' : 'bg-white text-slate-600 border-slate-200';
                     let icon = status === 'approved' ? 'fa-check text-green-500' : status === 'rejected' ? 'fa-times text-red-500' : 'fa-circle text-slate-300';
                     
+                    // Logic Step Locking (Simplified)
+                    let prevStepStatus = step.id === 1 ? 'approved' : getStepStatus(step.id - 1);
+                    let isLocked = prevStepStatus !== 'approved' && step.id > 1;
+                    
+                    if (isLocked) color += ' opacity-50 cursor-not-allowed';
+
                     return `
-                        <button onclick="UserModule.openProjectDetail('${project.id}', ${step.id})" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl border transition relative ${color} mx-1">
+                        <button onclick="${isLocked ? '' : `UserModule.openProjectDetail('${project.id}', ${step.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl border transition relative ${color} mx-1">
                             <div class="text-xs font-bold">Tahap ${step.id}</div>
                             <div class="text-[10px] text-center">${step.name}</div>
                             <i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i>
@@ -436,7 +450,6 @@
                     `;
                 }).join('');
 
-                // Render Content based on Step
                 let contentHtml = UserModule.getStepContent(activeStep, project, relations);
 
                 container.innerHTML = `
@@ -447,8 +460,15 @@
                         
                         <div class="flex overflow-x-auto pb-4 mb-4">${stepsHtml}</div>
                         
-                        <div class="bg-white rounded-2xl p-6 border shadow-sm relative">
+                        <div class="bg-white rounded-2xl p-6 border shadow-sm relative mb-6">
                             ${contentHtml}
+                        </div>
+
+                        <div class="bg-white rounded-2xl border shadow-sm p-6">
+                            <h3 class="font-bold text-lg mb-4">Timeline Per Event</h3>
+                            <div class="overflow-x-auto">
+                                ${UserModule.renderGanttChart([project])}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -457,28 +477,39 @@
             getStepContent: (stepId, p, r) => {
                 const status = r.approvals.find(a => a.step_number === stepId)?.status || 'pending';
                 const isAdmin = Auth.isAdmin();
+                const stepConfig = Core.SOP_STEPS.find(s => s.id === stepId);
                 
                 let controls = '';
-                if (status === 'pending') {
-                    controls = `<button onclick="UserModule.submitApproval('${p.id}', ${stepId})" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Ajukan Approval</button>`;
-                } else if (status === 'submitted') {
-                    controls = `<div class="bg-yellow-50 text-yellow-800 p-3 rounded-lg text-sm text-center">Menunggu Persetujuan Admin</div>`;
-                    if (isAdmin) {
-                        controls += `
-                            <div class="flex gap-2 mt-2">
-                                <button onclick="AdminModule.decide('${p.id}', ${stepId}, 'approved')" class="bg-green-600 text-white flex-1 py-2 rounded font-bold text-sm">Approve</button>
-                                <button onclick="AdminModule.decide('${p.id}', ${stepId}, 'rejected')" class="bg-red-600 text-white flex-1 py-2 rounded font-bold text-sm">Reject</button>
-                            </div>
+                
+                // Logic Tombol Approval (Berlaku untuk Step 1, 2, 3, 6 yang requiresApproval=true)
+                if (stepConfig.requiresApproval) {
+                    if (status === 'pending') {
+                        controls = `<button onclick="UserModule.submitApproval('${p.id}', ${stepId})" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full shadow-lg shadow-blue-200">Ajukan Approval</button>`;
+                    } else if (status === 'submitted') {
+                        controls = `<div class="bg-yellow-50 text-yellow-800 p-3 rounded-lg text-sm text-center border border-yellow-100">Menunggu Persetujuan Admin</div>`;
+                        if (isAdmin) {
+                            controls += `
+                                <div class="flex gap-2 mt-2">
+                                    <button onclick="AdminModule.decide('${p.id}', ${stepId}, 'approved')" class="bg-green-600 text-white flex-1 py-2 rounded font-bold text-sm">Approve</button>
+                                    <button onclick="AdminModule.decide('${p.id}', ${stepId}, 'rejected')" class="bg-red-600 text-white flex-1 py-2 rounded font-bold text-sm">Reject</button>
+                                </div>
+                            `;
+                        }
+                    } else if (status === 'approved') {
+                        controls = `<div class="bg-green-50 text-green-800 p-3 rounded-lg text-sm text-center font-bold border border-green-100"><i class="fas fa-check-circle"></i> Tahap Disetujui</div>`;
+                        // Auto-Next Button jika ingin manual
+                        if (stepId < 6) {
+                             controls += `<button onclick="UserModule.openProjectDetail('${p.id}', ${stepId+1})" class="mt-2 w-full bg-slate-100 text-slate-600 py-2 rounded font-bold text-sm">Lanjut ke Tahap ${stepId+1}</button>`;
+                        }
+                    } else if (status === 'rejected') {
+                        controls = `
+                            <div class="bg-red-50 text-red-800 p-3 rounded-lg text-sm text-center mb-2 border border-red-100">Ditolak. Silakan perbaiki dan ajukan ulang.</div>
+                            <button onclick="UserModule.submitApproval('${p.id}', ${stepId})" class="bg-slate-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Ajukan Ulang</button>
                         `;
                     }
-                } else if (status === 'approved') {
-                    controls = `<div class="bg-green-50 text-green-800 p-3 rounded-lg text-sm text-center font-bold"><i class="fas fa-check-circle"></i> Tahap Disetujui</div>`;
-                    // Auto next logic can be handled here
-                } else if (status === 'rejected') {
-                    controls = `
-                        <div class="bg-red-50 text-red-800 p-3 rounded-lg text-sm text-center mb-2">Ditolak. Silakan perbaiki.</div>
-                        <button onclick="UserModule.submitApproval('${p.id}', ${stepId})" class="bg-slate-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Ajukan Ulang</button>
-                    `;
+                } else {
+                    // Step tanpa approval (First Meet, Kegiatan)
+                    controls = `<button onclick="UserModule.openProjectDetail('${p.id}', ${stepId+1})" class="bg-teal-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Selesai, Lanjut Tahap Berikutnya</button>`;
                 }
 
                 // Dynamic forms based on step
@@ -486,23 +517,65 @@
                 if(stepId === 1) {
                     body = `
                         <label class="block text-xs font-bold text-slate-500 mb-1">TARGET AUDIENCE</label>
-                        <input value="${p.target_audience||''}" onchange="UserModule.updateField('${p.id}','target_audience',this.value)" class="w-full border p-2 rounded mb-4">
+                        <input value="${p.target_audience||''}" onchange="UserModule.updateField('${p.id}','target_audience',this.value)" class="w-full border p-2 rounded mb-4" placeholder="Nama Panti / Yayasan">
                         <label class="block text-xs font-bold text-slate-500 mb-1">KONSEP ACARA</label>
-                        <textarea onchange="UserModule.updateField('${p.id}','concept_note',this.value)" class="w-full border p-2 rounded" rows="4">${p.concept_note||''}</textarea>
+                        <textarea onchange="UserModule.updateField('${p.id}','concept_note',this.value)" class="w-full border p-2 rounded" rows="4" placeholder="Deskripsi konsep acara...">${p.concept_note||''}</textarea>
                     `;
                 } else if (stepId === 2) {
                     const total = r.budgets.reduce((a,b) => a + (b.total_price||0), 0);
                     body = `
-                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold">RAB</h4> <button onclick="UserModule.addItemModal('budgets', '${p.id}')" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">+ Item</button></div>
-                        <div class="bg-slate-50 p-2 rounded mb-4 text-sm space-y-2">
-                            ${r.budgets.map(b => `<div class="flex justify-between border-b pb-1"><span>${b.item_name} (${b.quantity})</span><span class="font-bold">${Core.formatCurrency(b.total_price)}</span></div>`).join('')}
-                            <div class="flex justify-between font-bold pt-1"><span>Total</span><span>${Core.formatCurrency(total)}</span></div>
+                        <!-- RAB Section -->
+                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Rencana Anggaran (RAB)</h4> <button onclick="UserModule.addItemModal('budgets', '${p.id}')" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold">+ Item Budget</button></div>
+                        <div class="bg-slate-50 p-3 rounded-xl border mb-6 text-sm space-y-2">
+                            ${r.budgets.length === 0 ? '<div class="text-center text-slate-400 italic">Belum ada data anggaran</div>' : ''}
+                            ${r.budgets.map(b => `<div class="flex justify-between border-b pb-1 last:border-0"><span>${b.item_name} (${b.quantity})</span><span class="font-bold">${Core.formatCurrency(b.total_price)}</span></div>`).join('')}
+                            <div class="flex justify-between font-bold pt-2 border-t mt-2 text-blue-700"><span>Total</span><span>${Core.formatCurrency(total)}</span></div>
                         </div>
+
+                        <!-- Rundown Section (Dikembalikan) -->
+                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Rundown Acara</h4> <button onclick="UserModule.openRundownModal('${p.id}')" class="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded font-bold">+ Kegiatan</button></div>
+                        <div class="bg-slate-50 p-3 rounded-xl border mb-6 text-sm space-y-2">
+                            ${r.rundowns.length === 0 ? '<div class="text-center text-slate-400 italic">Belum ada rundown</div>' : ''}
+                            ${r.rundowns.map(rd => `<div class="flex gap-3 border-b pb-1 last:border-0"><span class="font-mono bg-white px-1 rounded border text-xs h-fit">${rd.time_start}-${rd.time_end}</span><span>${rd.activity}</span></div>`).join('')}
+                        </div>
+
+                        <!-- Media Section -->
+                        <label class="block text-xs font-bold text-slate-500 mb-1">LINK POSTER / PUBLIKASI</label>
+                        <input value="${p.poster_link||''}" onchange="UserModule.updateField('${p.id}','poster_link',this.value)" class="w-full border p-2 rounded" placeholder="https://instagram.com/...">
                     `;
-                } else if (stepId === 6 && status === 'approved') {
-                     body = `<button onclick="PDFService.generate('${p.id}')" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold"><i class="fas fa-file-pdf mr-2"></i> Download Laporan PDF</button>`;
-                } else {
-                    body = `<p class="text-slate-500 text-sm italic">Isi data spesifik untuk tahap ini...</p>`;
+                } else if (stepId === 3) {
+                    body = `
+                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Divisi & Relawan</h4> <button onclick="UserModule.addItemModal('volunteers', '${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded font-bold">+ Divisi</button></div>
+                        <div class="grid grid-cols-2 gap-2 mb-4">
+                            ${r.volunteers.map(v => `<div class="bg-slate-50 p-2 rounded border text-sm flex justify-between"><span>${v.role_name}</span><span class="font-bold">${v.count}</span></div>`).join('')}
+                        </div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">STATUS PEMBELIAN LOGISTIK</label>
+                        <select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded mb-2">
+                            <option value="Belum Dimulai" ${p.purchase_status==='Belum Dimulai'?'selected':''}>Belum Dimulai</option>
+                            <option value="Dalam Proses" ${p.purchase_status==='Dalam Proses'?'selected':''}>Dalam Proses</option>
+                            <option value="Selesai" ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option>
+                        </select>
+                    `;
+                } else if (stepId === 4) {
+                    body = `
+                        <label class="block text-xs font-bold text-slate-500 mb-1">CATATAN FIRST MEET</label>
+                        <textarea onchange="UserModule.updateField('${p.id}','firstmeet_notes',this.value)" class="w-full border p-2 rounded" rows="5" placeholder="Hasil diskusi first meet...">${p.firstmeet_notes||''}</textarea>
+                    `;
+                } else if (stepId === 5) {
+                    body = `
+                        <div class="bg-blue-50 p-4 rounded-xl text-center mb-4">
+                            <h4 class="font-bold text-blue-800">Event Day (H-0)</h4>
+                            <p class="text-sm text-blue-600">Pastikan dokumentasi kegiatan berjalan dengan baik.</p>
+                        </div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">CATATAN EVALUASI EVENT</label>
+                        <textarea onchange="UserModule.updateField('${p.id}','eventday_notes',this.value)" class="w-full border p-2 rounded" rows="5">${p.eventday_notes||''}</textarea>
+                    `;
+                } else if (stepId === 6) {
+                     body = `
+                        <label class="block text-xs font-bold text-slate-500 mb-1">ISI LAPORAN / LINK DRIVE</label>
+                        <textarea onchange="UserModule.updateField('${p.id}','report_content',this.value)" class="w-full border p-2 rounded mb-4" rows="5">${p.report_content||''}</textarea>
+                        ${status === 'approved' ? `<button onclick="PDFService.generate('${p.id}')" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition"><i class="fas fa-file-pdf mr-2"></i> Download Laporan PDF</button>` : ''}
+                     `;
                 }
 
                 return `
@@ -523,18 +596,38 @@
             },
 
             addItemModal: (table, pid) => {
+                const title = table === 'budgets' ? 'Tambah Budget' : 'Tambah Divisi Relawan';
+                const fields = table === 'budgets' 
+                    ? `<input name="item_name" placeholder="Nama Item" class="w-full border p-2 rounded mb-2" required>
+                       <div class="flex gap-2 mb-2">
+                           <input name="quantity" type="number" placeholder="Qty" class="w-full border p-2 rounded" oninput="document.getElementById('tot').value = this.value * document.getElementById('prc').value">
+                           <input name="unit_price" id="prc" type="number" placeholder="Harga" class="w-full border p-2 rounded" oninput="document.getElementById('tot').value = this.value * document.getElementsByName('quantity')[0].value">
+                       </div>
+                       <input name="total_price" id="tot" readonly class="w-full border p-2 rounded bg-slate-100 mb-4">`
+                    : `<input name="role_name" placeholder="Nama Divisi" class="w-full border p-2 rounded mb-2" required>
+                       <input name="count" type="number" placeholder="Jumlah Orang" class="w-full border p-2 rounded mb-4">`;
+
                 const html = `
                     <form onsubmit="event.preventDefault(); UserModule.saveItem('${table}', '${pid}', this)">
-                        <input name="item_name" placeholder="Nama Item" class="w-full border p-2 rounded mb-2" required>
-                        <div class="flex gap-2 mb-2">
-                            <input name="quantity" type="number" placeholder="Qty" class="w-full border p-2 rounded" oninput="document.getElementById('tot').value = this.value * document.getElementById('prc').value">
-                            <input name="unit_price" id="prc" type="number" placeholder="Harga" class="w-full border p-2 rounded" oninput="document.getElementById('tot').value = this.value * document.getElementsByName('quantity')[0].value">
-                        </div>
-                        <input name="total_price" id="tot" readonly class="w-full border p-2 rounded bg-slate-100 mb-4">
-                        <button class="w-full bg-green-600 text-white py-2 rounded">Simpan</button>
+                        ${fields}
+                        <button class="w-full bg-green-600 text-white py-2 rounded font-bold">Simpan</button>
                     </form>
                 `;
-                Core.openGenericModal('Tambah Budget', html);
+                Core.openGenericModal(title, html);
+            },
+
+            openRundownModal: (pid) => {
+                const html = `
+                    <form onsubmit="event.preventDefault(); UserModule.saveItem('rundowns', '${pid}', this)">
+                        <div class="flex gap-2 mb-2">
+                            <input name="time_start" placeholder="Mulai (08:00)" class="w-full border p-2 rounded" required>
+                            <input name="time_end" placeholder="Selesai (09:00)" class="w-full border p-2 rounded" required>
+                        </div>
+                        <input name="activity" placeholder="Nama Kegiatan" class="w-full border p-2 rounded mb-4" required>
+                        <button class="w-full bg-green-600 text-white py-2 rounded font-bold">Simpan Rundown</button>
+                    </form>
+                `;
+                Core.openGenericModal('Tambah Rundown', html);
             },
 
             saveItem: async (table, pid, form) => {
@@ -543,27 +636,74 @@
                 d.project_id = pid;
                 await Core.supabase.from(table).insert(d);
                 Core.toggleModal('modal-generic');
-                UserModule.openProjectDetail(pid, 2); // Hardcoded to return to budget step for demo
+                UserModule.openProjectDetail(pid, table === 'rundowns' || table === 'budgets' ? 2 : 3);
             },
             
             deleteProject: async (id) => {
                 if(!confirm('Hapus proyek?')) return;
+                // Delete related data first
+                await Promise.all([
+                    Core.supabase.from('rundowns').delete().eq('project_id', id),
+                    Core.supabase.from('budgets').delete().eq('project_id', id),
+                    Core.supabase.from('volunteers').delete().eq('project_id', id),
+                    Core.supabase.from('project_approvals').delete().eq('project_id', id)
+                ]);
                 await Core.supabase.from('projects').delete().eq('id', id);
                 UserModule.projects = UserModule.projects.filter(p => p.id !== id);
                 App.router('projects');
                 Core.showToast('Proyek dihapus');
             },
 
-            renderGanttChart: () => {
-                // Simplified text Gantt for demo in single file
-                return `<div class="flex gap-1 h-8 bg-slate-100 rounded overflow-hidden">
-                    <div class="bg-slate-400 w-1/6" title="Submit Proposal"></div>
-                    <div class="bg-purple-400 w-1/6" title="Media & Finance"></div>
-                    <div class="bg-orange-400 w-1/6" title="Rekrutmen"></div>
-                    <div class="bg-yellow-400 w-1/6" title="First Meet"></div>
-                    <div class="bg-blue-400 w-1/6" title="Kegiatan"></div>
-                    <div class="bg-green-400 w-1/6" title="Laporan"></div>
-                </div>`;
+            renderGanttChart: (projectList) => {
+                if (!projectList || projectList.length === 0) return '<div class="text-slate-400 text-sm italic">Tidak ada data untuk timeline</div>';
+
+                // Gantt Chart Logic restoration
+                // Calculates timeline based on project event_date relative to milestones
+                // Milestones: H-18 (Prop), H-15 (Media), H-15 (Rekrut), H-3 (FirstMeet), H-0 (Event), H+2 (Laporan)
+                
+                const milestones = [
+                    { name: "Prop", days: -18, color: "bg-slate-400" },
+                    { name: "Media", days: -15, color: "bg-purple-400" },
+                    { name: "Rekrut", days: -15, color: "bg-orange-400" },
+                    { name: "FM", days: -3, color: "bg-yellow-500" },
+                    { name: "Event", days: 0, color: "bg-blue-500" },
+                    { name: "Lap", days: 2, color: "bg-green-500" }
+                ];
+
+                return `
+                    <div class="min-w-[600px] text-sm">
+                        ${projectList.map(p => {
+                            if(!p.event_date) return '';
+                            const eventDate = new Date(p.event_date);
+                            const startDate = new Date(eventDate); startDate.setDate(startDate.getDate() - 20); // H-20
+                            const totalRange = 25; // 20 days before + 5 days after
+
+                            return `
+                                <div class="mb-3 border-b pb-2">
+                                    <div class="font-bold text-slate-700 mb-1 flex justify-between">
+                                        <span>${p.title}</span>
+                                        <span class="text-xs font-normal text-slate-500">${Core.formatDate(p.event_date)}</span>
+                                    </div>
+                                    <div class="relative h-6 bg-slate-100 rounded overflow-hidden">
+                                        ${milestones.map(m => {
+                                            // Simple positioning: (DayOffset + 20) / TotalRange * 100
+                                            const pos = ((m.days + 20) / totalRange) * 100;
+                                            return `<div class="absolute top-0 h-full w-4 ${m.color} text-[8px] text-white flex items-center justify-center rounded-sm" style="left: ${pos}%;" title="${m.name} (H${m.days})">${m.name[0]}</div>`;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        <div class="flex gap-2 text-xs text-slate-500 mt-2">
+                            <span class="flex items-center"><div class="w-2 h-2 bg-slate-400 mr-1"></div> Proposal</span>
+                            <span class="flex items-center"><div class="w-2 h-2 bg-purple-400 mr-1"></div> Media</span>
+                            <span class="flex items-center"><div class="w-2 h-2 bg-orange-400 mr-1"></div> Rekrutmen</span>
+                            <span class="flex items-center"><div class="w-2 h-2 bg-yellow-500 mr-1"></div> First Meet</span>
+                            <span class="flex items-center"><div class="w-2 h-2 bg-blue-500 mr-1"></div> Event</span>
+                            <span class="flex items-center"><div class="w-2 h-2 bg-green-500 mr-1"></div> Laporan</span>
+                        </div>
+                    </div>
+                `;
             }
         };
 
