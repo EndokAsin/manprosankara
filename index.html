@@ -532,81 +532,96 @@
         // --- MODULE 5: PDF ENGINE ---
         const PDFService = {
             generate: async (pid) => {
-                Core.showToast('Menyiapkan PDF...');
-                const { data: p } = await Core.supabase.from('projects').select('*').eq('id', pid).single();
-                const { data: r } = await Core.supabase.from('rundowns').select('*').eq('project_id', pid);
-                const { data: b } = await Core.supabase.from('budgets').select('*').eq('project_id', pid);
-                const { data: g } = await Core.supabase.from('project_games').select('*').eq('project_id', pid);
+                try {
+                    Core.showToast('Menyiapkan PDF...');
+                    const { data: p, error: errP } = await Core.supabase.from('projects').select('*').eq('id', pid).single();
+                    if(errP) throw errP;
 
-                const doc = new window.jspdf.jsPDF();
-                let y = 20; const line = (txt, sz=10, type='normal') => { doc.setFontSize(sz); doc.setFont(undefined, type); doc.text(txt, 15, y); y+=sz/2+2; };
+                    const { data: r } = await Core.supabase.from('rundowns').select('*').eq('project_id', pid);
+                    const { data: b } = await Core.supabase.from('budgets').select('*').eq('project_id', pid);
+                    const { data: g } = await Core.supabase.from('project_games').select('*').eq('project_id', pid);
 
-                // Header
-                doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Sankara NGO", 105, y, null, null, 'center'); y+=10;
-                doc.setTextColor(0); doc.setFontSize(10);
-                line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); line(`Regional: ${p.regional} | Leader: ${p.leader}`); y+=5;
-                doc.setDrawColor(200); doc.line(15,y,195,y); y+=8;
+                    const doc = new window.jspdf.jsPDF();
+                    let y = 20; const line = (txt, sz=10, type='normal') => { doc.setFontSize(sz); doc.setFont(undefined, type); doc.text(txt, 15, y); y+=sz/2+2; };
 
-                // Konsep & Games
-                line("Konsep Acara:", 12, 'bold');
-                const splitKonsep = doc.splitTextToSize(p.concept_note||'-', 180); doc.text(splitKonsep, 15, y); y+=splitKonsep.length*5+5;
-                
-                if(g && g.length){
-                    line("Daftar Games & Edukasi:", 12, 'bold');
-                    g.forEach(gm => line(`- ${gm.title} (${gm.link||'-'})`)); y+=5;
-                }
+                    // Header
+                    doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Sankara NGO", 105, y, null, null, 'center'); y+=10;
+                    doc.setTextColor(0); doc.setFontSize(10);
+                    line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); line(`Regional: ${p.regional} | Leader: ${p.leader}`); y+=5;
+                    doc.setDrawColor(200); doc.line(15,y,195,y); y+=8;
 
-                // Tables
-                doc.autoTable({ startY: y, head: [['Item','Qty','Harga','Total']], body: [...b.map(x=>[x.item_name, x.quantity, Core.formatCurrency(x.unit_price), Core.formatCurrency(x.total_price)]), ['TOTAL','','', Core.formatCurrency(b.reduce((s,i)=>s+(i.total_price||0),0))]], theme: 'grid', headStyles: {fillColor:[22,163,74]} });
-                y = doc.lastAutoTable.finalY + 10;
-                
-                doc.autoTable({ startY: y, head: [['Waktu','Kegiatan']], body: r.map(x=>[`${x.time_start}-${x.time_end}`, x.activity]), theme: 'grid', headStyles: {fillColor:[22,163,74]} });
-                y = doc.lastAutoTable.finalY + 10;
-
-                // MODIFIED: Helper function to convert Image URL to JPEG Base64 via Canvas
-                const addImg = async (url, title) => {
-                    if(!url) return;
-                    if(y > 200) { doc.addPage(); y=20; }
-                    line(title, 12, 'bold');
-                    try {
-                        const blob = await fetch(url.startsWith('http') ? url : `${Core.supabase.storageUrl}/object/public/evidence/${url}`).then(r=>r.blob());
-                        
-                        // Create an image element
-                        const img = new Image();
-                        img.crossOrigin = 'Anonymous'; // FIX: Enable CORS for canvas
-                        const imgLoadPromise = new Promise((resolve, reject) => {
-                            img.onload = resolve;
-                            img.onerror = reject;
-                            img.src = URL.createObjectURL(blob);
-                        });
-                        
-                        await imgLoadPromise;
-
-                        // Draw on canvas with white background
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#FFFFFF'; // White bg to fix transparency issues
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0);
-                        
-                        // Convert to JPEG Base64
-                        const jpegBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                        
-                        doc.addImage(jpegBase64, 'JPEG', 15, y, 80, 60); 
-                        y+=65;
-                    } catch(e) { 
-                        console.error(e);
-                        line("(Gambar tidak dapat dimuat)", 10, 'italic'); 
+                    // Konsep & Games
+                    line("Konsep Acara:", 12, 'bold');
+                    const splitKonsep = doc.splitTextToSize(p.concept_note||'-', 180); doc.text(splitKonsep, 15, y); y+=splitKonsep.length*5+5;
+                    
+                    if(g && g.length){
+                        line("Daftar Games & Edukasi:", 12, 'bold');
+                        g.forEach(gm => line(`- ${gm.title} (${gm.link||'-'})`)); y+=5;
                     }
-                };
 
-                await addImg(p.firstmeet_proof, "Bukti First Meet:");
-                await addImg(p.report_proof, "Foto Laporan Akhir:");
+                    // Tables
+                    doc.autoTable({ startY: y, head: [['Item','Qty','Harga','Total']], body: [...b.map(x=>[x.item_name, x.quantity, Core.formatCurrency(x.unit_price), Core.formatCurrency(x.total_price)]), ['TOTAL','','', Core.formatCurrency(b.reduce((s,i)=>s+(i.total_price||0),0))]], theme: 'grid', headStyles: {fillColor:[22,163,74]} });
+                    y = doc.lastAutoTable.finalY + 10;
+                    
+                    doc.autoTable({ startY: y, head: [['Waktu','Kegiatan']], body: r.map(x=>[`${x.time_start}-${x.time_end}`, x.activity]), theme: 'grid', headStyles: {fillColor:[22,163,74]} });
+                    y = doc.lastAutoTable.finalY + 10;
 
-                doc.save(`Laporan_${p.title}.pdf`);
-                Core.showToast('Download Selesai');
+                    // MODIFIED: Helper function to convert Image URL to JPEG Base64 via Canvas
+                    const addImg = async (url, title) => {
+                        if(!url) return;
+                        if(y > 200) { doc.addPage(); y=20; }
+                        line(title, 12, 'bold');
+                        try {
+                            const safeUrl = url.startsWith('http') ? url : `${Core.SUPABASE_URL}/storage/v1/object/public/evidence/${url}`;
+                            // Cache buster to fix CORS
+                            const corsUrl = safeUrl + (safeUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+                            
+                            const blob = await fetch(corsUrl).then(res => {
+                                if (!res.ok) throw new Error('Network response was not ok');
+                                return res.blob();
+                            });
+                            
+                            // Create an image element
+                            const img = new Image();
+                            img.crossOrigin = 'Anonymous'; // FIX: Enable CORS for canvas
+                            const imgLoadPromise = new Promise((resolve, reject) => {
+                                img.onload = resolve;
+                                img.onerror = reject;
+                                img.src = URL.createObjectURL(blob);
+                            });
+                            
+                            await imgLoadPromise;
+
+                            // Draw on canvas with white background
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#FFFFFF'; // White bg to fix transparency issues
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // Convert to JPEG Base64
+                            const jpegBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                            
+                            doc.addImage(jpegBase64, 'JPEG', 15, y, 80, 60); 
+                            y+=65;
+                        } catch(e) { 
+                            console.error(e);
+                            line("(Gambar tidak dapat dimuat)", 10, 'italic'); 
+                        }
+                    };
+
+                    await addImg(p.firstmeet_proof, "Bukti First Meet:");
+                    await addImg(p.report_proof, "Foto Laporan Akhir:");
+
+                    doc.save(`Laporan_${p.title}.pdf`);
+                    Core.showToast('Download Selesai');
+                } catch (e) {
+                    console.error("PDF Error:", e);
+                    alert("Gagal download PDF: " + e.message); // Explicit alert
+                    Core.showToast('Gagal membuat PDF');
+                }
             }
         };
 
