@@ -785,23 +785,6 @@
 
             submitStepForApproval: async (projectId, stepNumber) => {
                 try {
-                    // PERBAIKAN: Simpan data proposal terlebih dahulu sebelum submit approval
-                    if (stepNumber === 1) {
-                        const targetAudience = document.getElementById('inp-target')?.value;
-                        const conceptNote = document.getElementById('inp-concept')?.value;
-                        
-                        if (targetAudience || conceptNote) {
-                            const updates = {};
-                            if (targetAudience) updates.target_audience = targetAudience;
-                            if (conceptNote) updates.concept_note = conceptNote;
-                            
-                            await supabase
-                                .from('projects')
-                                .update(updates)
-                                .eq('id', projectId);
-                        }
-                    }
-
                     const { error } = await supabase
                         .from('project_approvals')
                         .upsert([
@@ -864,18 +847,12 @@
                         app.showToast(`Step berhasil ${statusText}`);
                         app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
                         
-                        // Jika step disetujui, update status proyek ke step berikutnya
-                        if (newStatus === APPROVAL_STATUS.APPROVED) {
-                            const nextStep = stepNumber + 1;
-                            if (nextStep <= 6) {
-                                const nextStepInfo = SOP_STEPS.find(s => s.id === nextStep);
-                                if (nextStepInfo) {
-                                    await supabase
-                                        .from('projects')
-                                        .update({ status: nextStepInfo.fullStatus })
-                                        .eq('id', projectId);
-                                }
-                            }
+                        // Jika step 6 disetujui, update status proyek menjadi selesai
+                        if (newStatus === APPROVAL_STATUS.APPROVED && stepNumber === 6) {
+                            await supabase
+                                .from('projects')
+                                .update({ status: 'Tahap 6: Laporan - Selesai' })
+                                .eq('id', projectId);
                         }
                         
                         app.getProjectDetails(projectId, stepNumber);
@@ -969,7 +946,7 @@
                     `;
                 }
                 
-                // Step 1: Submit Proposal
+                // Step 1: Submit Proposal - PERBAIKAN: Tambah fungsi save data
                 if(app.activeStepTab === 1) {
                     const stepStatus = app.getStepStatus(project.id, 1);
                     
@@ -995,11 +972,18 @@
                                     <textarea id="inp-concept" rows="3" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Jelaskan konsep...">${project.concept_note || ''}</textarea>
                                 </div>
                                 
-                                ${stepStatus === APPROVAL_STATUS.PENDING ? `
-                                    <button onclick="app.submitStepForApproval('${project.id}', 1)" class="w-full mt-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
-                                        Ajukan untuk Approval <i class="fas fa-paper-plane ml-2"></i>
+                                <!-- PERBAIKAN: Tombol save data terpisah -->
+                                <div class="flex gap-2">
+                                    <button onclick="app.saveProposalData('${project.id}')" class="flex-1 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-bold transition">
+                                        Simpan Data <i class="fas fa-save ml-1"></i>
                                     </button>
-                                ` : ''}
+                                    
+                                    ${stepStatus === APPROVAL_STATUS.PENDING ? `
+                                        <button onclick="app.submitStepForApproval('${project.id}', 1)" class="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition">
+                                            Ajukan Approval <i class="fas fa-paper-plane ml-1"></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
                                 
                                 ${stepStatus === APPROVAL_STATUS.SUBMITTED && isAdmin ? `
                                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
@@ -1032,13 +1016,15 @@
                                 ` : ''}
                                 
                                 ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep === 1 ? `
-                                    <button onclick="app.saveAndNext('${project.id}', 2, {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
+                                    <button onclick="app.saveAndNext('${project.id}', 2)" class="w-full mt-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-200 transition">
                                         Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
                                     </button>
                                 ` : ''}
                                 
                                 ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep > 1 ? `
-                                    <button onclick="app.updateMultiField('${project.id}', {target_audience: document.getElementById('inp-target').value, concept_note: document.getElementById('inp-concept').value})" class="text-xs bg-purple-100 text-purple-700 px-4 py-2 rounded-lg font-bold">Update Data</button>
+                                    <button onclick="app.saveProposalData('${project.id}')" class="w-full mt-4 py-2 bg-purple-100 text-purple-700 rounded-lg font-bold border border-purple-200">
+                                        Update Data Proposal
+                                    </button>
                                 ` : ''}
                             </div>
                         </div>`;
@@ -1175,7 +1161,7 @@
                             ` : ''}
                             
                             ${stepStatus === APPROVAL_STATUS.APPROVED && currentStatusStep === 2 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 3, {poster_link: document.getElementById('inp-poster').value})" class="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">
+                                <button onclick="app.saveAndNext('${project.id}', 3)" class="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition">
                                     Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
                                 </button>
                             ` : ''}
@@ -1221,7 +1207,7 @@
                                 </div>
                             </div>
                             ${currentStatusStep === 3 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 4, null)" class="w-full mt-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">
+                                <button onclick="app.saveAndNext('${project.id}', 4)" class="w-full mt-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-200 transition">
                                     Simpan & Lanjut <i class="fas fa-arrow-right ml-2"></i>
                                 </button>
                             ` : ''}
@@ -1253,7 +1239,7 @@
                                 <button onclick="app.updateField('${project.id}', 'firstmeet_notes', document.getElementById('inp-firstmeet').value)" class="mt-2 text-xs bg-orange-100 text-orange-800 px-3 py-1 rounded font-bold">Simpan Catatan</button>
                             </div>
                             ${currentStatusStep === 4 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 5, null)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">
+                                <button onclick="app.saveAndNext('${project.id}', 5)" class="w-full mt-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">
                                     First Meet Selesai <i class="fas fa-arrow-right ml-2"></i>
                                 </button>
                             ` : ''}
@@ -1283,7 +1269,7 @@
                                 <button onclick="app.updateField('${project.id}', 'eventday_notes', document.getElementById('inp-eventday').value)" class="mt-2 text-xs bg-green-100 text-green-800 px-3 py-1 rounded font-bold">Simpan Catatan</button>
                             </div>
                             ${currentStatusStep === 5 ? `
-                                <button onclick="app.saveAndNext('${project.id}', 6, null)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">
+                                <button onclick="app.saveAndNext('${project.id}', 6)" class="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition">
                                     Acara Selesai, Lanjut Laporan <i class="fas fa-check ml-2"></i>
                                 </button>
                             ` : ''}
@@ -1310,11 +1296,18 @@
                                 <label class="block text-sm font-bold text-slate-700 mb-1">Isi Laporan / Link Drive</label>
                                 <textarea id="inp-report" rows="5" class="w-full border rounded-lg px-4 py-2 bg-slate-50" placeholder="Tulis ringkasan laporan atau link drive untuk dokumentasi...">${project.report_content || ''}</textarea>
                                 
-                                ${stepStatus === APPROVAL_STATUS.PENDING ? `
-                                    <button onclick="app.submitStepForApproval('${project.id}', 6)" class="w-full mt-4 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg shadow-slate-200 transition">
-                                        Ajukan untuk Approval <i class="fas fa-paper-plane ml-2"></i>
+                                <!-- PERBAIKAN: Tombol save data terpisah -->
+                                <div class="flex gap-2 mt-2">
+                                    <button onclick="app.updateField('${project.id}', 'report_content', document.getElementById('inp-report').value)" class="flex-1 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-bold">
+                                        Simpan Laporan
                                     </button>
-                                ` : ''}
+                                    
+                                    ${stepStatus === APPROVAL_STATUS.PENDING ? `
+                                        <button onclick="app.submitStepForApproval('${project.id}', 6)" class="flex-1 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-bold">
+                                            Ajukan Approval
+                                        </button>
+                                    ` : ''}
+                                </div>
                                 
                                 ${stepStatus === APPROVAL_STATUS.SUBMITTED && isAdmin ? `
                                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
@@ -1449,6 +1442,69 @@
                 `;
                 
                 container.innerHTML = html;
+            },
+
+            // PERBAIKAN: Fungsi untuk menyimpan data proposal
+            saveProposalData: async (projectId) => {
+                try {
+                    const targetAudience = document.getElementById('inp-target')?.value || '';
+                    const conceptNote = document.getElementById('inp-concept')?.value || '';
+                    
+                    const { error } = await supabase
+                        .from('projects')
+                        .update({ 
+                            target_audience: targetAudience,
+                            concept_note: conceptNote
+                        })
+                        .eq('id', projectId);
+                    
+                    if (error) {
+                        app.showToast("Gagal menyimpan data proposal: " + error.message);
+                    } else {
+                        app.showToast("Data proposal berhasil disimpan!");
+                    }
+                } catch (error) {
+                    console.error('Error in saveProposalData:', error);
+                    app.showToast("Terjadi error saat menyimpan data proposal");
+                }
+            },
+
+            // PERBAIKAN: Fungsi saveAndNext yang diperbaiki
+            saveAndNext: async (id, nextStepId) => {
+                try {
+                    // Validasi: pastikan step saat ini sudah disetujui jika memerlukan approval
+                    const currentStep = SOP_STEPS.find(s => s.id === (nextStepId - 1));
+                    if (currentStep && currentStep.requiresApproval) {
+                        const currentStepStatus = app.getStepStatus(id, nextStepId - 1);
+                        if (currentStepStatus !== APPROVAL_STATUS.APPROVED) {
+                            app.showToast("Step saat ini belum disetujui. Tidak bisa lanjut ke step berikutnya.");
+                            return;
+                        }
+                    }
+                    
+                    const step = SOP_STEPS.find(s => s.id === nextStepId);
+                    
+                    // Untuk step 1, simpan data proposal terlebih dahulu
+                    if (nextStepId === 2) {
+                        await app.saveProposalData(id);
+                    }
+                    
+                    // Update status proyek
+                    const { error } = await supabase
+                        .from('projects')
+                        .update({ status: step.fullStatus })
+                        .eq('id', id);
+                        
+                    if (error) {
+                        app.showToast("Error update status: " + error.message);
+                    } else {
+                        app.showToast("Berhasil lanjut ke Tahap " + nextStepId);
+                        app.getProjectDetails(id, nextStepId);
+                    }
+                } catch (error) {
+                    console.error('Error in saveAndNext:', error);
+                    app.showToast("Terjadi error saat menyimpan dan lanjut");
+                }
             },
 
             // Fungsi untuk export PDF
@@ -2025,39 +2081,6 @@
                 } catch (error) {
                     console.error('Error in updateFinanceStatus:', error);
                     app.showToast("Terjadi error saat update status keuangan");
-                }
-            },
-
-            saveAndNext: async (id, nextStepId, updates) => {
-                try {
-                    // Validasi: pastikan step saat ini sudah disetujui jika memerlukan approval
-                    const currentStep = SOP_STEPS.find(s => s.id === (nextStepId - 1));
-                    if (currentStep && currentStep.requiresApproval) {
-                        const currentStepStatus = app.getStepStatus(id, nextStepId - 1);
-                        if (currentStepStatus !== APPROVAL_STATUS.APPROVED) {
-                            app.showToast("Step saat ini belum disetujui. Tidak bisa lanjut ke step berikutnya.");
-                            return;
-                        }
-                    }
-                    
-                    const step = SOP_STEPS.find(s => s.id === nextStepId);
-                    if (updates) {
-                        const { error } = await supabase.from('projects').update(updates).eq('id', id);
-                        if (error) { 
-                            app.showToast("Gagal simpan data."); 
-                            return; 
-                        }
-                    }
-                    const { error } = await supabase.from('projects').update({ status: step.fullStatus }).eq('id', id);
-                    if (!error) {
-                        app.showToast("Berhasil lanjut ke Tahap " + nextStepId);
-                        app.getProjectDetails(id, nextStepId);
-                    } else {
-                        app.showToast("Error status: " + error.message);
-                    }
-                } catch (error) {
-                    console.error('Error in saveAndNext:', error);
-                    app.showToast("Terjadi error saat menyimpan dan lanjut");
                 }
             },
 
