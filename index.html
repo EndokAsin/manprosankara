@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- jsPDF -->
+    <!-- jsPDF & AutoTable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     
@@ -29,33 +29,18 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .page-transition { transition: all 0.3s ease-in-out; }
         
-        /* Sidebar active state */
-        .sidebar-item { transition: all 0.2s ease; }
-        .sidebar-item.active {
-            background-color: #f0fdf4; color: #059669;
-            box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.1); border: 1px solid #bbf7d0;
+        /* Gantt Chart Enhanced */
+        .gantt-cell:hover .gantt-tooltip { display: block; }
+        .today-line {
+            position: absolute; top: 0; bottom: 0; width: 2px; background-color: #ef4444; 
+            z-index: 10; border-left: 1px dashed #ef4444; pointer-events: none;
         }
-        .status-badge { @apply px-3 py-1 rounded-full text-xs font-bold border; }
-        .status-pending { @apply bg-yellow-100 text-yellow-800 border-yellow-200; }
-        .status-submitted { @apply bg-blue-100 text-blue-800 border-blue-200; }
-        .status-approved { @apply bg-green-100 text-green-800 border-green-200; }
-        .status-rejected { @apply bg-red-100 text-red-800 border-red-200; }
-        .step-locked { opacity: 0.6; cursor: not-allowed; }
-        .step-unlocked { cursor: pointer; }
-        
-        /* Gantt Chart Styles */
-        .gantt-bar { transition: all 0.3s ease; }
-        .timeline-milestone { position: relative; }
-        .timeline-milestone::before { content: ''; position: absolute; left: -8px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #16a34a; }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen flex overflow-hidden">
     
-    <!-- 1. NOTIFICATIONS & MODALS (GLOBAL) -->
-    
-    <!-- Toast -->
+    <!-- Toast & Modals -->
     <div id="toast" class="fixed top-5 right-5 z-50 transform transition-transform translate-x-full duration-300">
         <div class="bg-white border-l-4 border-green-500 rounded-lg shadow-xl p-4 flex items-center pr-8">
             <i class="fas fa-check-circle text-green-500 mr-3 text-xl"></i>
@@ -71,52 +56,14 @@
                 <button onclick="Core.toggleModal('login-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <form id="login-form" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Email Admin</label>
-                    <input type="email" id="login-email" required class="w-full px-4 py-3 border rounded-xl" placeholder="admin@sankara.org">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
-                    <input type="password" id="login-password" required class="w-full px-4 py-3 border rounded-xl" placeholder="admin123">
-                </div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">Email</label><input type="email" id="login-email" class="w-full px-4 py-3 border rounded-xl" placeholder="admin@sankara.org"></div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">Password</label><input type="password" id="login-password" class="w-full px-4 py-3 border rounded-xl" placeholder="admin123"></div>
                 <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">Masuk</button>
-                <div class="text-xs text-slate-500 text-center mt-4">Demo: admin@sankara.org / admin123</div>
             </form>
         </div>
     </div>
 
-    <!-- Project Modal -->
-    <div id="modal-project" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div class="bg-white px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="font-bold text-lg text-slate-800">Proyek Baru</h3>
-                <button onclick="Core.toggleModal('modal-project')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
-            </div>
-            <form id="form-project" class="p-6 space-y-4">
-                <input type="hidden" name="id" id="project-id">
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">NAMA KEGIATAN</label><input type="text" name="title" required class="w-full border rounded-lg px-3 py-2"></div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1">REGIONAL</label>
-                        <select name="regional" id="regional-select" required class="w-full border rounded-lg px-3 py-2">
-                            <option value="">Pilih Regional</option>
-                        </select>
-                    </div>
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1">LEADER</label><input type="text" name="leader" class="w-full border rounded-lg px-3 py-2"></div>
-                </div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">TEMA</label><input type="text" name="theme" class="w-full border rounded-lg px-3 py-2"></div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1">TANGGAL</label><input type="date" name="event_date" required class="w-full border rounded-lg px-3 py-2"></div>
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1">LOKASI</label><input type="text" name="location" class="w-full border rounded-lg px-3 py-2"></div>
-                </div>
-                <input type="hidden" name="status" value="Tahap 1: Submit Proposal">
-                <input type="hidden" name="finance_status" value="Belum Diajukan">
-                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">Simpan Proyek</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Generic Modal (Used for dynamic content) -->
+    <!-- Generic Modal -->
     <div id="modal-generic" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
@@ -127,95 +74,51 @@
         </div>
     </div>
 
-    <!-- 2. LAYOUT STRUCTURE -->
-    
-    <!-- Sidebar -->
+    <!-- Layout -->
     <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-20">
         <div class="p-6 flex items-center border-b border-slate-100">
             <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-green-200 shadow-lg">S</div>
             <h1 class="text-xl font-bold text-slate-800">SANKARA <span class="text-green-600">PM</span></h1>
         </div>
-        
-        <!-- User Info Badge -->
-        <div class="p-4 border-b border-slate-100">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600"><i class="fas fa-user"></i></div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-slate-800 truncate" id="sidebar-username">Guest User</p>
-                    <p class="text-xs text-slate-500" id="sidebar-role">Mode Tamu</p>
-                </div>
-            </div>
+        <div class="p-4 border-b border-slate-100 flex items-center space-x-3">
+            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600"><i class="fas fa-user"></i></div>
+            <div class="flex-1 min-w-0"><p class="text-sm font-medium truncate" id="sidebar-username">Guest</p><p class="text-xs text-slate-500" id="sidebar-role">Mode Tamu</p></div>
         </div>
-        
-        <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-            <button id="nav-dashboard" onclick="App.router('dashboard')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item text-slate-600 hover:bg-green-50 font-medium flex items-center group">
-                <i class="fas fa-chart-pie w-6 text-slate-400 group-hover:text-green-600"></i> Dashboard
-            </button>
-            <button id="nav-projects" onclick="App.router('projects')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item text-slate-600 hover:bg-green-50 font-medium flex items-center group">
-                <i class="fas fa-layer-group w-6 text-slate-400 group-hover:text-green-600"></i> Manajemen Proyek
-            </button>
-            
-            <!-- Admin Only Section -->
+            <button id="nav-dashboard" onclick="App.router('dashboard')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-green-50 text-slate-600 flex items-center"><i class="fas fa-chart-pie w-6"></i> Dashboard</button>
+            <button id="nav-projects" onclick="App.router('projects')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-green-50 text-slate-600 flex items-center"><i class="fas fa-layer-group w-6"></i> Proyek</button>
             <div id="admin-menu-section" class="hidden mt-6">
-                <div class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Admin Area</div>
-                <button id="nav-approvals" onclick="App.router('approvals')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item text-slate-600 hover:bg-blue-50 font-medium flex items-center group">
-                    <i class="fas fa-check-circle w-6 text-slate-400 group-hover:text-blue-600"></i> Approval Proyek
-                </button>
-                <button id="nav-users" onclick="App.router('users')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item text-slate-600 hover:bg-purple-50 font-medium flex items-center group">
-                    <i class="fas fa-users w-6 text-slate-400 group-hover:text-purple-600"></i> Manajemen User
-                </button>
+                <div class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase">Admin</div>
+                <button id="nav-approvals" onclick="App.router('approvals')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-blue-50 text-slate-600 flex items-center"><i class="fas fa-check-circle w-6"></i> Approvals</button>
             </div>
         </nav>
-        
-        <div class="p-4 border-t border-slate-100 bg-slate-50">
-            <button id="btn-login-sidebar" onclick="Core.toggleModal('login-modal')" class="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-medium">
-                <i class="fas fa-sign-in-alt mr-2"></i> Login Admin
-            </button>
-            <button id="btn-logout-sidebar" onclick="Auth.logout()" class="w-full hidden items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition font-medium">
-                <i class="fas fa-sign-out-alt mr-2"></i> Logout
-            </button>
+        <div class="p-4 border-t border-slate-100">
+            <button id="btn-login-sidebar" onclick="Core.toggleModal('login-modal')" class="w-full px-4 py-2 bg-green-600 text-white rounded-xl">Login</button>
+            <button id="btn-logout-sidebar" onclick="Auth.logout()" class="w-full px-4 py-2 bg-white border rounded-xl hidden">Logout</button>
         </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <!-- Header -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
         <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
-            <div class="font-bold text-green-700 flex items-center gap-2">
-                <span class="md:hidden">SANKARA PM</span>
-                <span class="hidden md:inline">SANKARA PROJECT MANAGEMENT SYSTEM</span>
-            </div>
-            <div class="flex items-center gap-4">
-                <div id="admin-badge" class="hidden">
-                    <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs font-bold border border-purple-200"><i class="fas fa-crown mr-1"></i> Admin</span>
-                </div>
-                <button onclick="Core.toggleModal('login-modal')" id="header-login-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold md:hidden">Login</button>
-            </div>
+            <div class="font-bold text-green-700">SANKARA PM SYSTEM</div>
+            <button onclick="Core.toggleModal('login-modal')" id="header-login-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold md:hidden">Login</button>
         </header>
-
-        <!-- Dynamic Content Area -->
-        <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar">
-            <!-- Content injected by JS -->
-        </div>
+        <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar"></div>
     </main>
 
-    <!-- 3. JAVASCRIPT LOGIC (MODULARIZED) -->
     <script>
         // --- MODULE 1: CORE & CONFIG ---
         const Core = {
             supabase: null,
             SOP_STEPS: [
-                { id: 1, name: "Submit Proposal", desc: "H-18", fullStatus: "Tahap 1: Submit Proposal", nextStatus: "Tahap 2: Media & Finance", requiresApproval: true },
-                { id: 2, name: "Media & Finance", desc: "H-15", fullStatus: "Tahap 2: Media & Finance", nextStatus: "Tahap 3: Rekrutmen & Pembelian", requiresApproval: true },
-                { id: 3, name: "Rekrutmen & Pembelian", desc: "H-15 s/d H-5", fullStatus: "Tahap 3: Rekrutmen & Pembelian", nextStatus: "Tahap 4: First Meet", requiresApproval: true }, // MODIFIKASI: requiresApproval: true
-                { id: 4, name: "First Meet", desc: "H-3", fullStatus: "Tahap 4: First Meet", nextStatus: "Tahap 5: Kegiatan", requiresApproval: false },
-                { id: 5, name: "Kegiatan", desc: "H-0", fullStatus: "Tahap 5: Kegiatan", nextStatus: "Tahap 6: Laporan", requiresApproval: false },
-                { id: 6, name: "Laporan", desc: "H+2", fullStatus: "Tahap 6: Laporan", nextStatus: "Tahap 6: Laporan - Selesai", requiresApproval: true }
+                { id: 1, name: "Submit Proposal", desc: "H-18", requiresApproval: true },
+                { id: 2, name: "Media & Finance", desc: "H-15", requiresApproval: true },
+                { id: 3, name: "Rekrutmen & Beli", desc: "H-15 s/d H-5", requiresApproval: true }, 
+                { id: 4, name: "First Meet", desc: "H-3", requiresApproval: false },
+                { id: 5, name: "Kegiatan", desc: "H-0", requiresApproval: false },
+                { id: 6, name: "Laporan", desc: "H+2", requiresApproval: true }
             ],
-            APPROVAL_STATUS: { PENDING: 'pending', SUBMITTED: 'submitted', APPROVED: 'approved', REJECTED: 'rejected' },
-            FINANCE_STATUS: { PENDING: 'Belum Diajukan', SUBMITTED: 'Diajukan', ACCEPTED: 'Diterima', REJECTED: 'Ditolak' },
-
+            
             initSupabase: () => {
                 const SUPABASE_URL = 'https://ruehfvjwdasqpzmroaau.supabase.co';
                 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
@@ -242,81 +145,40 @@
             },
 
             fetchRegions: async () => {
-                try {
-                    const { data, error } = await Core.supabase.from('regions').select('*').order('name');
-                    const regions = data || [{name:'Bandung'},{name:'Jakarta'},{name:'Surabaya'},{name:'Yogyakarta'}]; // Fallback
-                    const select = document.getElementById('regional-select');
-                    if (select) select.innerHTML = '<option value="">Pilih Regional</option>' + regions.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
-                    return regions;
-                } catch(e) { console.error(e); return []; }
+                const { data } = await Core.supabase.from('regions').select('*').order('name');
+                return data || [{name:'Bandung'},{name:'Jakarta'},{name:'Surabaya'},{name:'Yogyakarta'}];
             }
         };
 
         // --- MODULE 2: AUTHENTICATION ---
         const Auth = {
             currentUser: null,
-            
             init: () => {
                 const saved = localStorage.getItem('sankara_admin');
-                if (saved) {
-                    Auth.currentUser = JSON.parse(saved);
-                    Auth.updateUI(true);
-                } else {
-                    Auth.updateUI(false);
-                }
-                
+                if (saved) { Auth.currentUser = JSON.parse(saved); Auth.updateUI(true); }
                 document.getElementById('login-form').addEventListener('submit', Auth.handleLogin);
             },
-
-            handleLogin: async (e) => {
+            handleLogin: (e) => {
                 e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-                
-                // Demo logic (Replace with Supabase auth in prod)
-                if (email === 'admin@sankara.org' && password === 'admin123') {
-                    Auth.currentUser = { name: 'Admin Sankara', email: email, role: 'admin', regional: 'All' };
+                // Simple demo auth
+                if (document.getElementById('login-email').value === 'admin@sankara.org') {
+                    Auth.currentUser = { name: 'Admin Sankara', role: 'admin' };
                     localStorage.setItem('sankara_admin', JSON.stringify(Auth.currentUser));
-                    Auth.updateUI(true);
-                    Core.toggleModal('login-modal');
-                    Core.showToast('Login berhasil!');
+                    Auth.updateUI(true); Core.toggleModal('login-modal'); Core.showToast('Login berhasil');
                     App.router('dashboard');
-                } else {
-                    Core.showToast('Email atau password salah');
                 }
             },
-
-            logout: () => {
-                localStorage.removeItem('sankara_admin');
-                Auth.currentUser = null;
-                Auth.updateUI(false);
-                Core.showToast('Logout berhasil');
-                App.router('projects');
-            },
-
-            isAdmin: () => Auth.currentUser && Auth.currentUser.role === 'admin',
-
+            logout: () => { localStorage.removeItem('sankara_admin'); Auth.currentUser = null; Auth.updateUI(false); App.router('projects'); },
+            isAdmin: () => Auth.currentUser?.role === 'admin',
             updateUI: (isLoggedIn) => {
-                const user = Auth.currentUser;
-                document.getElementById('sidebar-username').textContent = isLoggedIn ? user.name : 'Guest User';
                 document.getElementById('sidebar-role').textContent = isLoggedIn ? 'Administrator' : 'Mode Tamu';
-                
-                const show = (id) => document.getElementById(id)?.classList.remove('hidden');
-                const hide = (id) => document.getElementById(id)?.classList.add('hidden');
-
-                if (isLoggedIn) {
-                    hide('btn-login-sidebar'); show('btn-logout-sidebar');
-                    show('admin-menu-section'); show('admin-badge');
-                    hide('header-login-btn');
-                } else {
-                    show('btn-login-sidebar'); hide('btn-logout-sidebar');
-                    hide('admin-menu-section'); hide('admin-badge');
-                    show('header-login-btn');
-                }
+                const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+                toggle('btn-login-sidebar', !isLoggedIn); toggle('btn-logout-sidebar', isLoggedIn);
+                toggle('admin-menu-section', isLoggedIn); toggle('header-login-btn', !isLoggedIn);
             }
         };
 
-        // --- MODULE 3: USER VIEWS (Dashboard, Projects) ---
+        // --- MODULE 3: USER VIEWS ---
         const UserModule = {
             projects: [],
             activeProjectId: null,
@@ -327,76 +189,69 @@
                 UserModule.projects = data || [];
             },
 
-            renderDashboard: async (container) => {
+            renderDashboard: (container) => {
                 const total = UserModule.projects.length;
-                const done = UserModule.projects.filter(p => p.status && p.status.includes('Tahap 6') && p.status.includes('Selesai')).length;
-                const progress = total - done;
-
+                const done = UserModule.projects.filter(p => p.status?.includes('Selesai')).length;
                 container.innerHTML = `
                     <div class="fade-in">
                         <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center">
-                                <span class="text-3xl font-bold text-slate-800">${total}</span>
-                                <span class="text-sm text-slate-500">Total Proyek</span>
-                            </div>
-                            <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center text-green-600">
-                                <span class="text-3xl font-bold">${done}</span>
-                                <span class="text-sm">Selesai</span>
-                            </div>
-                            <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center text-blue-600">
-                                <span class="text-3xl font-bold">${progress}</span>
-                                <span class="text-sm">Dalam Proses</span>
-                            </div>
+                            <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center"><span class="text-3xl font-bold">${total}</span><span class="text-sm text-slate-500">Total Proyek</span></div>
+                            <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center text-green-600"><span class="text-3xl font-bold">${done}</span><span class="text-sm">Selesai</span></div>
+                            <div class="bg-white p-6 rounded-xl border shadow-sm flex flex-col items-center text-blue-600"><span class="text-3xl font-bold">${total-done}</span><span class="text-sm">Proses</span></div>
                         </div>
-                        <div class="bg-white rounded-xl border shadow-sm p-6 mb-8">
-                            <h3 class="font-bold text-lg mb-4">Gantt Chart Utama</h3>
-                            <div class="overflow-x-auto">
-                                ${UserModule.renderGanttChart(UserModule.projects)}
-                            </div>
-                        </div>
-                    </div>
-                `;
+                        <div class="bg-white rounded-xl border p-6"><h3 class="font-bold mb-4">Timeline Global</h3><div class="overflow-x-auto">${UserModule.renderGanttChart(UserModule.projects)}</div></div>
+                    </div>`;
             },
 
             renderProjectList: async (container) => {
-                const filtered = UserModule.filterRegion === 'all' 
-                    ? UserModule.projects 
-                    : UserModule.projects.filter(p => p.regional === UserModule.filterRegion);
-
-                const regions = await Core.fetchRegions(); 
-
+                const regions = await Core.fetchRegions();
+                const filtered = UserModule.filterRegion === 'all' ? UserModule.projects : UserModule.projects.filter(p => p.regional === UserModule.filterRegion);
                 container.innerHTML = `
                     <div class="fade-in">
-                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                        <div class="flex justify-between items-center mb-6">
                             <h2 class="text-2xl font-bold">Daftar Proyek</h2>
                             <div class="flex gap-2">
                                 <select onchange="UserModule.filterRegion=this.value; App.router('projects')" class="border rounded-lg px-3 py-2 text-sm">
                                     <option value="all">Semua Regional</option>
                                     ${regions.map(r => `<option value="${r.name}" ${UserModule.filterRegion===r.name?'selected':''}>${r.name}</option>`).join('')}
                                 </select>
-                                <button onclick="Core.toggleModal('modal-project')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm">+ Buat Proyek</button>
+                                <button onclick="UserModule.openNewProjectModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm">+ Buat Proyek</button>
                             </div>
                         </div>
                         <div class="grid gap-4">
-                            ${filtered.length === 0 ? '<div class="p-8 text-center text-slate-500 bg-white rounded-xl border">Belum ada data proyek</div>' : ''}
                             ${filtered.map(p => `
                                 <div onclick="UserModule.openProjectDetail('${p.id}')" class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md cursor-pointer transition relative group">
-                                    <div class="absolute top-4 right-4 z-10">
-                                        <button onclick="event.stopPropagation(); UserModule.deleteProject('${p.id}')" class="bg-white text-slate-300 hover:text-red-600 p-2 rounded-full shadow-sm hover:shadow transition"><i class="fas fa-trash"></i></button>
-                                    </div>
-                                    <div class="flex justify-between items-start mb-2">
-                                        <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded">${p.regional || 'N/A'}</span>
-                                        <span class="text-xs text-slate-500">${Core.formatDate(p.event_date)}</span>
-                                    </div>
+                                    <div class="flex justify-between items-start mb-2"><span class="bg-slate-800 text-white text-xs px-2 py-1 rounded">${p.regional}</span><span class="text-xs text-slate-500">${Core.formatDate(p.event_date)}</span></div>
                                     <h3 class="font-bold text-lg mb-1">${p.title}</h3>
                                     <div class="text-sm text-slate-500 mb-2">${p.status}</div>
-                                    <div class="text-xs text-slate-400"><i class="fas fa-user mr-1"></i> ${p.leader || '-'}</div>
+                                    <button onclick="event.stopPropagation(); UserModule.deleteProject('${p.id}')" class="absolute top-4 right-4 text-slate-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
                                 </div>
                             `).join('')}
                         </div>
-                    </div>
-                `;
+                    </div>`;
+            },
+
+            openNewProjectModal: () => {
+                const html = `
+                    <form onsubmit="event.preventDefault(); UserModule.createProject(this)">
+                        <input name="title" placeholder="Nama Kegiatan" class="w-full border p-2 rounded mb-2" required>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <select name="regional" class="border p-2 rounded" required><option value="">Pilih Regional</option><option>Bandung</option><option>Jakarta</option><option>Surabaya</option><option>Yogyakarta</option></select>
+                            <input name="leader" placeholder="Leader" class="w-full border p-2 rounded">
+                        </div>
+                        <input type="date" name="event_date" class="w-full border p-2 rounded mb-2" required>
+                        <input name="location" placeholder="Lokasi" class="w-full border p-2 rounded mb-4">
+                        <button class="w-full bg-green-600 text-white py-2 rounded font-bold">Simpan</button>
+                    </form>`;
+                Core.openGenericModal('Proyek Baru', html);
+            },
+
+            createProject: async (form) => {
+                const d = Object.fromEntries(new FormData(form));
+                d.status = 'Tahap 1: Submit Proposal';
+                await Core.supabase.from('projects').insert(d);
+                Core.toggleModal('modal-generic'); Core.showToast('Proyek Dibuat'); App.router('projects');
             },
 
             openProjectDetail: async (id, stepId = 1) => {
@@ -404,452 +259,333 @@
                 const container = document.getElementById('content-area');
                 container.innerHTML = '<div class="flex h-full items-center justify-center"><div class="loading-spinner"></div></div>';
                 
-                const { data: project } = await Core.supabase.from('projects').select('*').eq('id', id).single();
-                if(!project) return App.router('projects');
+                const { data: p } = await Core.supabase.from('projects').select('*').eq('id', id).single();
+                if(!p) return App.router('projects');
 
-                const [rundowns, budgets, volunteers, approvals] = await Promise.all([
+                const [rundowns, budgets, volunteers, approvals, games] = await Promise.all([
                     Core.supabase.from('rundowns').select('*').eq('project_id', id),
                     Core.supabase.from('budgets').select('*').eq('project_id', id),
                     Core.supabase.from('volunteers').select('*').eq('project_id', id),
-                    Core.supabase.from('project_approvals').select('*').eq('project_id', id)
+                    Core.supabase.from('project_approvals').select('*').eq('project_id', id),
+                    Core.supabase.from('project_games').select('*').eq('project_id', id)
                 ]);
 
-                UserModule.renderDetailView(container, project, {
-                    rundowns: rundowns.data, budgets: budgets.data, volunteers: volunteers.data, approvals: approvals.data
-                }, stepId);
+                UserModule.renderDetailView(container, p, { rundowns: rundowns.data, budgets: budgets.data, volunteers: volunteers.data, approvals: approvals.data, games: games.data }, stepId);
             },
 
-            renderDetailView: (container, project, relations, activeStep) => {
-                const getStepStatus = (stepNum) => {
-                    const app = relations.approvals.find(a => a.step_number === stepNum);
-                    return app ? app.status : 'pending';
-                };
-
-                const stepsHtml = Core.SOP_STEPS.map(step => {
-                    const status = getStepStatus(step.id);
-                    const isActive = activeStep === step.id;
-                    // Logic penguncian step: User bisa klik step jika step sebelumnya 'approved' ATAU step 1 (selalu buka)
-                    // Namun untuk admin, semua step mungkin bisa dilihat. 
-                    // Disini kita buat sederhana: step sebelumnya harus approved untuk akses step berikutnya.
-                    
-                    let color = isActive ? 'bg-green-600 text-white' : 'bg-white text-slate-600 border-slate-200';
-                    let icon = status === 'approved' ? 'fa-check text-green-500' : status === 'rejected' ? 'fa-times text-red-500' : 'fa-circle text-slate-300';
-                    
-                    // Logic Step Locking (Simplified)
-                    let prevStepStatus = step.id === 1 ? 'approved' : getStepStatus(step.id - 1);
-                    let isLocked = prevStepStatus !== 'approved' && step.id > 1;
-                    
-                    if (isLocked) color += ' opacity-50 cursor-not-allowed';
-
-                    return `
-                        <button onclick="${isLocked ? '' : `UserModule.openProjectDetail('${project.id}', ${step.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl border transition relative ${color} mx-1">
-                            <div class="text-xs font-bold">Tahap ${step.id}</div>
-                            <div class="text-[10px] text-center">${step.name}</div>
-                            <i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i>
-                        </button>
-                    `;
+            renderDetailView: (container, p, r, activeStep) => {
+                const getStatus = (sid) => r.approvals.find(a => a.step_number === sid)?.status || 'pending';
+                const stepsHtml = Core.SOP_STEPS.map(s => {
+                    const st = getStatus(s.id);
+                    const locked = s.id > 1 && getStatus(s.id-1) !== 'approved';
+                    const active = activeStep === s.id ? 'bg-green-600 text-white' : 'bg-white text-slate-600 border';
+                    const icon = st === 'approved' ? 'fa-check text-green-500' : 'fa-circle text-slate-300';
+                    return `<button onclick="${locked?'':`UserModule.openProjectDetail('${p.id}',${s.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl transition mx-1 ${active} ${locked?'opacity-50 cursor-not-allowed':''}">
+                        <div class="text-xs font-bold">Tahap ${s.id}</div><div class="text-[10px]">${s.name}</div><i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i>
+                    </button>`;
                 }).join('');
 
-                let contentHtml = UserModule.getStepContent(activeStep, project, relations);
-
                 container.innerHTML = `
-                    <div class="fade-in pb-10">
-                        <button onclick="App.router('projects')" class="text-sm text-slate-500 hover:text-green-600 mb-4"><i class="fas fa-arrow-left"></i> Kembali</button>
-                        <h1 class="text-2xl font-bold text-slate-800 mb-1">${project.title}</h1>
-                        <p class="text-sm text-slate-500 mb-6">${project.regional} • ${Core.formatDate(project.event_date)}</p>
-                        
+                    <div class="fade-in pb-20">
+                        <button onclick="App.router('projects')" class="text-sm text-slate-500 mb-4"><i class="fas fa-arrow-left"></i> Kembali</button>
+                        <h1 class="text-2xl font-bold mb-1">${p.title}</h1>
+                        <p class="text-sm text-slate-500 mb-6">${p.regional} • ${Core.formatDate(p.event_date)}</p>
                         <div class="flex overflow-x-auto pb-4 mb-4">${stepsHtml}</div>
-                        
-                        <div class="bg-white rounded-2xl p-6 border shadow-sm relative mb-6">
-                            ${contentHtml}
-                        </div>
-
-                        <div class="bg-white rounded-2xl border shadow-sm p-6">
-                            <h3 class="font-bold text-lg mb-4">Timeline Per Event</h3>
-                            <div class="overflow-x-auto">
-                                ${UserModule.renderGanttChart([project])}
-                            </div>
-                        </div>
-                    </div>
-                `;
+                        <div class="bg-white rounded-2xl p-6 border shadow-sm mb-6">${UserModule.getStepContent(activeStep, p, r)}</div>
+                        <div class="bg-white rounded-2xl border shadow-sm p-6"><h3 class="font-bold text-lg mb-4">Timeline Detail</h3><div class="overflow-x-auto">${UserModule.renderGanttChart([p])}</div></div>
+                    </div>`;
             },
 
-            getStepContent: (stepId, p, r) => {
-                const status = r.approvals.find(a => a.step_number === stepId)?.status || 'pending';
+            getStepContent: (sid, p, r) => {
+                const status = r.approvals.find(a => a.step_number === sid)?.status || 'pending';
                 const isAdmin = Auth.isAdmin();
-                const stepConfig = Core.SOP_STEPS.find(s => s.id === stepId);
+                const step = Core.SOP_STEPS.find(s => s.id === sid);
                 
                 let controls = '';
-                
-                // Logic Tombol Approval (Berlaku untuk Step 1, 2, 3, 6 yang requiresApproval=true)
-                if (stepConfig.requiresApproval) {
-                    if (status === 'pending') {
-                        controls = `<button onclick="UserModule.submitApproval('${p.id}', ${stepId})" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full shadow-lg shadow-blue-200">Ajukan Approval</button>`;
-                    } else if (status === 'submitted') {
-                        controls = `<div class="bg-yellow-50 text-yellow-800 p-3 rounded-lg text-sm text-center border border-yellow-100">Menunggu Persetujuan Admin</div>`;
-                        if (isAdmin) {
-                            controls += `
-                                <div class="flex gap-2 mt-2">
-                                    <button onclick="AdminModule.decide('${p.id}', ${stepId}, 'approved')" class="bg-green-600 text-white flex-1 py-2 rounded font-bold text-sm">Approve</button>
-                                    <button onclick="AdminModule.decide('${p.id}', ${stepId}, 'rejected')" class="bg-red-600 text-white flex-1 py-2 rounded font-bold text-sm">Reject</button>
-                                </div>
-                            `;
-                        }
-                    } else if (status === 'approved') {
-                        controls = `<div class="bg-green-50 text-green-800 p-3 rounded-lg text-sm text-center font-bold border border-green-100"><i class="fas fa-check-circle"></i> Tahap Disetujui</div>`;
-                        // Auto-Next Button jika ingin manual
-                        if (stepId < 6) {
-                             controls += `<button onclick="UserModule.openProjectDetail('${p.id}', ${stepId+1})" class="mt-2 w-full bg-slate-100 text-slate-600 py-2 rounded font-bold text-sm">Lanjut ke Tahap ${stepId+1}</button>`;
-                        }
-                    } else if (status === 'rejected') {
-                        controls = `
-                            <div class="bg-red-50 text-red-800 p-3 rounded-lg text-sm text-center mb-2 border border-red-100">Ditolak. Silakan perbaiki dan ajukan ulang.</div>
-                            <button onclick="UserModule.submitApproval('${p.id}', ${stepId})" class="bg-slate-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Ajukan Ulang</button>
-                        `;
-                    }
+                if(step.requiresApproval) {
+                    if(status === 'pending') controls = `<button onclick="UserModule.submitApproval('${p.id}', ${sid})" class="bg-blue-600 text-white w-full py-2 rounded font-bold">Ajukan Approval</button>`;
+                    else if(status === 'submitted') controls = isAdmin ? `<div class="flex gap-2"><button onclick="AdminModule.decide('${p.id}',${sid},'approved')" class="bg-green-600 text-white flex-1 py-2 rounded">Approve</button><button onclick="AdminModule.decide('${p.id}',${sid},'rejected')" class="bg-red-600 text-white flex-1 py-2 rounded">Reject</button></div>` : `<div class="bg-yellow-50 text-yellow-800 p-3 rounded text-center">Menunggu Approval</div>`;
+                    else if(status === 'approved') controls = `<div class="bg-green-50 text-green-800 p-3 rounded text-center font-bold mb-2">Disetujui</div>${sid<6?`<button onclick="UserModule.openProjectDetail('${p.id}',${sid+1})" class="bg-slate-100 w-full py-2 rounded">Lanjut Step ${sid+1}</button>`:''}`;
+                    else controls = `<div class="bg-red-50 text-red-800 p-3 rounded text-center mb-2">Ditolak</div><button onclick="UserModule.submitApproval('${p.id}',${sid})" class="bg-slate-600 text-white w-full py-2 rounded">Ajukan Ulang</button>`;
                 } else {
-                    // Step tanpa approval (First Meet, Kegiatan)
-                    controls = `<button onclick="UserModule.openProjectDetail('${p.id}', ${stepId+1})" class="bg-teal-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Selesai, Lanjut Tahap Berikutnya</button>`;
+                    controls = `<button onclick="UserModule.openProjectDetail('${p.id}',${sid+1})" class="bg-teal-600 text-white w-full py-2 rounded font-bold">Selesai, Lanjut</button>`;
                 }
 
-                // Dynamic forms based on step
-                let body = '';
-                if(stepId === 1) {
-                    body = `
-                        <label class="block text-xs font-bold text-slate-500 mb-1">TARGET AUDIENCE</label>
-                        <input value="${p.target_audience||''}" onchange="UserModule.updateField('${p.id}','target_audience',this.value)" class="w-full border p-2 rounded mb-4" placeholder="Nama Panti / Yayasan">
-                        <label class="block text-xs font-bold text-slate-500 mb-1">KONSEP ACARA</label>
-                        <textarea onchange="UserModule.updateField('${p.id}','concept_note',this.value)" class="w-full border p-2 rounded" rows="4" placeholder="Deskripsi konsep acara...">${p.concept_note||''}</textarea>
+                // Banner Informasi Deadline Step yang diperkuat (Wajib Tampil)
+                let body = `<div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded mb-6 flex items-start">
+                    <div class="mr-3 mt-1"><i class="fas fa-clock"></i></div>
+                    <div>
+                        <p class="font-bold text-sm uppercase tracking-wide">Batas Waktu (Deadline)</p>
+                        <p class="text-sm font-medium">${step.desc} (Dari Hari H)</p>
+                    </div>
+                </div>`;
+                
+                if(sid === 1) {
+                    body += `
+                        <label class="text-xs font-bold text-slate-500">TARGET AUDIENCE</label><input value="${p.target_audience||''}" onchange="UserModule.updateField('${p.id}','target_audience',this.value)" class="w-full border p-2 rounded mb-2">
+                        <label class="text-xs font-bold text-slate-500">KONSEP ACARA</label><textarea onchange="UserModule.updateField('${p.id}','concept_note',this.value)" class="w-full border p-2 rounded mb-4" rows="4">${p.concept_note||''}</textarea>
+                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Games & Referensi</h4><button onclick="UserModule.addItemModal('project_games','${p.id}')" class="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">+ Tambah</button></div>
+                        <div class="bg-slate-50 p-3 rounded border mb-4 text-sm">${(r.games||[]).map(g => `<div>- <b>${g.title}</b> (${g.link||'-'})</div>`).join('')}</div>
                     `;
-                } else if (stepId === 2) {
-                    const total = r.budgets.reduce((a,b) => a + (b.total_price||0), 0);
-                    body = `
-                        <!-- RAB Section -->
-                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Rencana Anggaran (RAB)</h4> <button onclick="UserModule.addItemModal('budgets', '${p.id}')" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold">+ Item Budget</button></div>
-                        <div class="bg-slate-50 p-3 rounded-xl border mb-6 text-sm space-y-2">
-                            ${r.budgets.length === 0 ? '<div class="text-center text-slate-400 italic">Belum ada data anggaran</div>' : ''}
-                            ${r.budgets.map(b => `<div class="flex justify-between border-b pb-1 last:border-0"><span>${b.item_name} (${b.quantity})</span><span class="font-bold">${Core.formatCurrency(b.total_price)}</span></div>`).join('')}
-                            <div class="flex justify-between font-bold pt-2 border-t mt-2 text-blue-700"><span>Total</span><span>${Core.formatCurrency(total)}</span></div>
+                } else if (sid === 2) {
+                    const total = (r.budgets||[]).reduce((a,b)=>a+(b.total_price||0),0);
+                    body += `
+                        <div class="flex justify-between mb-2"><h4 class="font-bold">RAB</h4><button onclick="UserModule.addItemModal('budgets','${p.id}')" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">+ Item</button></div>
+                        <div class="bg-slate-50 p-3 rounded border mb-4 text-sm space-y-1">${(r.budgets||[]).map(b=>`<div class="flex justify-between border-b pb-1"><span>${b.item_name} (${b.quantity})</span><span>${Core.formatCurrency(b.total_price)}</span></div>`).join('')}<div class="flex justify-between font-bold pt-1 text-blue-700"><span>Total</span><span>${Core.formatCurrency(total)}</span></div></div>
+                        <div class="flex justify-between mb-2"><h4 class="font-bold">Rundown</h4><button onclick="UserModule.openRundownModal('${p.id}')" class="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">+ Kegiatan</button></div>
+                        <div class="bg-slate-50 p-3 rounded border mb-4 text-sm space-y-1">${(r.rundowns||[]).map(rd=>`<div class="flex gap-2 border-b pb-1"><span class="font-mono bg-white border px-1">${rd.time_start}-${rd.time_end}</span><span>${rd.activity}</span></div>`).join('')}</div>
+                        <label class="text-xs font-bold text-slate-500">LINK POSTER</label><input value="${p.poster_link||''}" onchange="UserModule.updateField('${p.id}','poster_link',this.value)" class="w-full border p-2 rounded">
+                    `;
+                } else if (sid === 3) {
+                    body += `
+                        <div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded">+ Divisi</button></div>
+                        <div class="grid grid-cols-2 gap-2 mb-4">${(r.volunteers||[]).map(v=>`<div class="bg-slate-50 p-2 rounded border text-sm flex justify-between"><span>${v.role_name}</span><b>${v.count}</b></div>`).join('')}</div>
+                        <label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>
+                    `;
+                } else if (sid === 4) {
+                    body += `
+                        <label class="text-xs font-bold text-slate-500">CATATAN FIRST MEET</label><textarea onchange="UserModule.updateField('${p.id}','firstmeet_notes',this.value)" class="w-full border p-2 rounded mb-4" rows="4">${p.firstmeet_notes||''}</textarea>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
+                            <h4 class="font-bold text-slate-700 text-sm mb-2"><i class="fas fa-cloud-upload-alt mr-2"></i>Bukti First Meet (Foto/Absensi)</h4>
+                            <div class="space-y-3">
+                                <input type="file" onchange="UserModule.uploadFile('${p.id}','evidence',this.files[0],'firstmeet_proof')" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                <div class="relative"><div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-gray-200"></div></div><div class="relative flex justify-center"><span class="px-2 bg-slate-50 text-xs text-gray-500">Atau via Link Drive</span></div></div>
+                                <input value="${p.firstmeet_proof||''}" onchange="UserModule.updateField('${p.id}','firstmeet_proof',this.value)" class="w-full border p-2 rounded text-sm bg-white" placeholder="Tempel Link Google Drive / Dropbox disini">
+                                ${p.firstmeet_proof ? `<div class="mt-2"><img src="${p.firstmeet_proof}" class="h-32 rounded border shadow-sm object-cover hover:h-auto"><a href="${p.firstmeet_proof}" target="_blank" class="text-xs text-blue-500 underline block mt-1">Lihat Gambar Full</a></div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                } else if (sid === 5) {
+                    body += `<label class="text-xs font-bold text-slate-500">CATATAN EVALUASI EVENT</label><textarea onchange="UserModule.updateField('${p.id}','eventday_notes',this.value)" class="w-full border p-2 rounded" rows="5">${p.eventday_notes||''}</textarea>`;
+                } else if (sid === 6) {
+                    body += `
+                        <label class="text-xs font-bold text-slate-500">ISI LAPORAN</label><textarea onchange="UserModule.updateField('${p.id}','report_content',this.value)" class="w-full border p-2 rounded mb-4" rows="5">${p.report_content||''}</textarea>
+                        
+                        <!-- Bukti Laporan Akhir (Visual Fix) -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300 mb-4">
+                            <h4 class="font-bold text-slate-700 text-sm mb-2"><i class="fas fa-cloud-upload-alt mr-2"></i>Bukti Laporan Akhir (Foto Kegiatan)</h4>
+                            <div class="space-y-3">
+                                <input type="file" onchange="UserModule.uploadFile('${p.id}','evidence',this.files[0],'report_proof')" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                <div class="relative"><div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-gray-200"></div></div><div class="relative flex justify-center"><span class="px-2 bg-slate-50 text-xs text-gray-500">Atau via Link Drive</span></div></div>
+                                <input value="${p.report_proof||''}" onchange="UserModule.updateField('${p.id}','report_proof',this.value)" class="w-full border p-2 rounded text-sm bg-white" placeholder="Tempel Link Google Drive / Dropbox disini">
+                                ${p.report_proof ? `<div class="mt-2"><img src="${p.report_proof}" class="h-32 rounded border shadow-sm object-cover hover:h-auto"><a href="${p.report_proof}" target="_blank" class="text-xs text-blue-500 underline block mt-1">Lihat Gambar Full</a></div>` : ''}
+                            </div>
                         </div>
 
-                        <!-- Rundown Section (Dikembalikan) -->
-                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Rundown Acara</h4> <button onclick="UserModule.openRundownModal('${p.id}')" class="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded font-bold">+ Kegiatan</button></div>
-                        <div class="bg-slate-50 p-3 rounded-xl border mb-6 text-sm space-y-2">
-                            ${r.rundowns.length === 0 ? '<div class="text-center text-slate-400 italic">Belum ada rundown</div>' : ''}
-                            ${r.rundowns.map(rd => `<div class="flex gap-3 border-b pb-1 last:border-0"><span class="font-mono bg-white px-1 rounded border text-xs h-fit">${rd.time_start}-${rd.time_end}</span><span>${rd.activity}</span></div>`).join('')}
-                        </div>
-
-                        <!-- Media Section -->
-                        <label class="block text-xs font-bold text-slate-500 mb-1">LINK POSTER / PUBLIKASI</label>
-                        <input value="${p.poster_link||''}" onchange="UserModule.updateField('${p.id}','poster_link',this.value)" class="w-full border p-2 rounded" placeholder="https://instagram.com/...">
+                        ${status==='approved' ? `<button onclick="PDFService.generate('${p.id}')" class="w-full bg-red-600 text-white py-3 rounded font-bold hover:bg-red-700 transition"><i class="fas fa-file-pdf mr-2"></i> Export Laporan PDF Lengkap</button>` : ''}
                     `;
-                } else if (stepId === 3) {
-                    body = `
-                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Divisi & Relawan</h4> <button onclick="UserModule.addItemModal('volunteers', '${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded font-bold">+ Divisi</button></div>
-                        <div class="grid grid-cols-2 gap-2 mb-4">
-                            ${r.volunteers.map(v => `<div class="bg-slate-50 p-2 rounded border text-sm flex justify-between"><span>${v.role_name}</span><span class="font-bold">${v.count}</span></div>`).join('')}
-                        </div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1">STATUS PEMBELIAN LOGISTIK</label>
-                        <select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded mb-2">
-                            <option value="Belum Dimulai" ${p.purchase_status==='Belum Dimulai'?'selected':''}>Belum Dimulai</option>
-                            <option value="Dalam Proses" ${p.purchase_status==='Dalam Proses'?'selected':''}>Dalam Proses</option>
-                            <option value="Selesai" ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option>
-                        </select>
-                    `;
-                } else if (stepId === 4) {
-                    body = `
-                        <label class="block text-xs font-bold text-slate-500 mb-1">CATATAN FIRST MEET</label>
-                        <textarea onchange="UserModule.updateField('${p.id}','firstmeet_notes',this.value)" class="w-full border p-2 rounded" rows="5" placeholder="Hasil diskusi first meet...">${p.firstmeet_notes||''}</textarea>
-                    `;
-                } else if (stepId === 5) {
-                    body = `
-                        <div class="bg-blue-50 p-4 rounded-xl text-center mb-4">
-                            <h4 class="font-bold text-blue-800">Event Day (H-0)</h4>
-                            <p class="text-sm text-blue-600">Pastikan dokumentasi kegiatan berjalan dengan baik.</p>
-                        </div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1">CATATAN EVALUASI EVENT</label>
-                        <textarea onchange="UserModule.updateField('${p.id}','eventday_notes',this.value)" class="w-full border p-2 rounded" rows="5">${p.eventday_notes||''}</textarea>
-                    `;
-                } else if (stepId === 6) {
-                     body = `
-                        <label class="block text-xs font-bold text-slate-500 mb-1">ISI LAPORAN / LINK DRIVE</label>
-                        <textarea onchange="UserModule.updateField('${p.id}','report_content',this.value)" class="w-full border p-2 rounded mb-4" rows="5">${p.report_content||''}</textarea>
-                        ${status === 'approved' ? `<button onclick="PDFService.generate('${p.id}')" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition"><i class="fas fa-file-pdf mr-2"></i> Download Laporan PDF</button>` : ''}
-                     `;
                 }
-
-                return `
-                    <div class="mb-4">${body}</div>
-                    <div class="mt-4 pt-4 border-t">${controls}</div>
-                `;
+                return `<div>${body}</div><div class="mt-4 pt-4 border-t">${controls}</div>`;
             },
 
-            updateField: async (id, field, val) => {
-                await Core.supabase.from('projects').update({[field]: val}).eq('id', id);
-                Core.showToast('Data tersimpan');
+            updateField: async (id, col, val) => { 
+                const { error } = await Core.supabase.from('projects').update({[col]: val}).eq('id', id); 
+                if(error) {
+                    console.error(error);
+                    Core.showToast('Gagal Simpan DB: ' + error.message);
+                    return false;
+                }
+                Core.showToast('Tersimpan'); 
+                return true;
+            },
+            
+            uploadFile: async (pid, bucket, file, dbCol) => {
+                if(!file) return;
+                Core.showToast('Mengupload file... Mohon tunggu');
+                const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                const fileName = `${pid}/${Date.now()}_${safeName}`;
+                
+                const { error } = await Core.supabase.storage.from(bucket).upload(fileName, file);
+                if(!error) {
+                    const { data } = Core.supabase.storage.from(bucket).getPublicUrl(fileName);
+                    const success = await UserModule.updateField(pid, dbCol, data.publicUrl);
+                    if(success) {
+                        Core.showToast('Upload Sukses! Merefresh...');
+                        setTimeout(() => UserModule.openProjectDetail(pid, dbCol === 'firstmeet_proof' ? 4 : 6), 1000); 
+                    }
+                } else { Core.showToast('Gagal Upload: '+error.message); }
             },
 
-            submitApproval: async (id, step) => {
-                await Core.supabase.from('project_approvals').upsert({ project_id: id, step_number: step, status: 'submitted', submitted_at: new Date() });
-                Core.showToast('Approval diajukan');
-                UserModule.openProjectDetail(id, step);
-            },
-
+            submitApproval: async (id, step) => { await Core.supabase.from('project_approvals').upsert({project_id: id, step_number: step, status: 'submitted'}); Core.showToast('Diajukan'); UserModule.openProjectDetail(id, step); },
+            
             addItemModal: (table, pid) => {
-                const title = table === 'budgets' ? 'Tambah Budget' : 'Tambah Divisi Relawan';
-                const fields = table === 'budgets' 
-                    ? `<input name="item_name" placeholder="Nama Item" class="w-full border p-2 rounded mb-2" required>
-                       <div class="flex gap-2 mb-2">
-                           <input name="quantity" type="number" placeholder="Qty" class="w-full border p-2 rounded" oninput="document.getElementById('tot').value = this.value * document.getElementById('prc').value">
-                           <input name="unit_price" id="prc" type="number" placeholder="Harga" class="w-full border p-2 rounded" oninput="document.getElementById('tot').value = this.value * document.getElementsByName('quantity')[0].value">
-                       </div>
-                       <input name="total_price" id="tot" readonly class="w-full border p-2 rounded bg-slate-100 mb-4">`
-                    : `<input name="role_name" placeholder="Nama Divisi" class="w-full border p-2 rounded mb-2" required>
-                       <input name="count" type="number" placeholder="Jumlah Orang" class="w-full border p-2 rounded mb-4">`;
-
-                const html = `
-                    <form onsubmit="event.preventDefault(); UserModule.saveItem('${table}', '${pid}', this)">
-                        ${fields}
-                        <button class="w-full bg-green-600 text-white py-2 rounded font-bold">Simpan</button>
-                    </form>
-                `;
-                Core.openGenericModal(title, html);
+                let html = '';
+                if(table === 'budgets') html = `<input name="item_name" placeholder="Item" class="w-full border p-2 rounded mb-2" required><div class="flex gap-2 mb-2"><input name="quantity" placeholder="Qty" class="w-full border p-2 rounded"><input name="unit_price" placeholder="Harga" class="w-full border p-2 rounded"></div>`;
+                if(table === 'volunteers') html = `<input name="role_name" placeholder="Divisi" class="w-full border p-2 rounded mb-2" required><input name="count" placeholder="Jml" class="w-full border p-2 rounded">`;
+                if(table === 'project_games') html = `<input name="title" placeholder="Nama Game" class="w-full border p-2 rounded mb-2" required><input name="link" placeholder="Link Referensi" class="w-full border p-2 rounded">`;
+                Core.openGenericModal('Tambah Data', `<form onsubmit="event.preventDefault();UserModule.saveItem('${table}','${pid}',this)">${html}<button class="w-full bg-green-600 text-white py-2 rounded mt-4">Simpan</button></form>`);
             },
-
+            
             openRundownModal: (pid) => {
-                const html = `
-                    <form onsubmit="event.preventDefault(); UserModule.saveItem('rundowns', '${pid}', this)">
-                        <div class="flex gap-2 mb-2">
-                            <input name="time_start" placeholder="Mulai (08:00)" class="w-full border p-2 rounded" required>
-                            <input name="time_end" placeholder="Selesai (09:00)" class="w-full border p-2 rounded" required>
-                        </div>
-                        <input name="activity" placeholder="Nama Kegiatan" class="w-full border p-2 rounded mb-4" required>
-                        <button class="w-full bg-green-600 text-white py-2 rounded font-bold">Simpan Rundown</button>
-                    </form>
-                `;
-                Core.openGenericModal('Tambah Rundown', html);
+                Core.openGenericModal('Tambah Rundown', `<form onsubmit="event.preventDefault();UserModule.saveItem('rundowns','${pid}',this)"><div class="flex gap-2 mb-2"><input name="time_start" placeholder="Mulai" class="w-full border p-2 rounded"><input name="time_end" placeholder="Selesai" class="w-full border p-2 rounded"></div><input name="activity" placeholder="Kegiatan" class="w-full border p-2 rounded" required><button class="w-full bg-green-600 text-white py-2 rounded mt-4">Simpan</button></form>`);
             },
 
             saveItem: async (table, pid, form) => {
-                const fd = new FormData(form);
-                const d = Object.fromEntries(fd);
-                d.project_id = pid;
-                await Core.supabase.from(table).insert(d);
-                Core.toggleModal('modal-generic');
-                UserModule.openProjectDetail(pid, table === 'rundowns' || table === 'budgets' ? 2 : 3);
+                const d = Object.fromEntries(new FormData(form)); d.project_id = pid;
+                await Core.supabase.from(table).insert(d); Core.toggleModal('modal-generic');
+                UserModule.openProjectDetail(pid, table==='project_games'?1:(table==='volunteers'?3:2));
             },
-            
+
             deleteProject: async (id) => {
-                if(!confirm('Hapus proyek?')) return;
-                // Delete related data first
-                await Promise.all([
-                    Core.supabase.from('rundowns').delete().eq('project_id', id),
-                    Core.supabase.from('budgets').delete().eq('project_id', id),
-                    Core.supabase.from('volunteers').delete().eq('project_id', id),
-                    Core.supabase.from('project_approvals').delete().eq('project_id', id)
-                ]);
+                if(!confirm('Hapus?')) return;
                 await Core.supabase.from('projects').delete().eq('id', id);
-                UserModule.projects = UserModule.projects.filter(p => p.id !== id);
-                App.router('projects');
-                Core.showToast('Proyek dihapus');
+                UserModule.loadData(); App.router('projects');
             },
 
-            renderGanttChart: (projectList) => {
-                if (!projectList || projectList.length === 0) return '<div class="text-slate-400 text-sm italic">Tidak ada data untuk timeline</div>';
-
-                // Gantt Chart Logic restoration
-                // Calculates timeline based on project event_date relative to milestones
-                // Milestones: H-18 (Prop), H-15 (Media), H-15 (Rekrut), H-3 (FirstMeet), H-0 (Event), H+2 (Laporan)
+            renderGanttChart: (list) => {
+                if(!list.length) return '';
+                const today = new Date();
+                const header = Array.from({length:26},(_,i)=>{ const d=i-20; return `<div class="w-8 shrink-0 text-center text-xs ${[-18,-15,-3,0,2].includes(d)?'bg-slate-200 font-bold':''}">${d===0?'H':(d>0?'+'+d:d)}</div>` }).join('');
                 
-                const milestones = [
-                    { name: "Prop", days: -18, color: "bg-slate-400" },
-                    { name: "Media", days: -15, color: "bg-purple-400" },
-                    { name: "Rekrut", days: -15, color: "bg-orange-400" },
-                    { name: "FM", days: -3, color: "bg-yellow-500" },
-                    { name: "Event", days: 0, color: "bg-blue-500" },
-                    { name: "Lap", days: 2, color: "bg-green-500" }
-                ];
+                return `<div class="min-w-[800px] relative">
+                    <div class="flex border-b pb-2 mb-2"><div class="w-40 shrink-0">Project</div><div class="flex">${header}</div></div>
+                    ${list.map(p=>{
+                        if(!p.event_date) return '';
+                        const eventDate = new Date(p.event_date);
+                        // Hitung posisi Today (H-x)
+                        const diffTime = today - eventDate;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        // Posisi garis Today (Relative ke range -20 s/d +5)
+                        // Range mulai dari -20. Jadi index 0 adalah H-20.
+                        // Jika hari ini H-10, maka index-nya adalah (-10) - (-20) = 10.
+                        // Width per cell approx 32px (w-8). Offset kiri 160px (w-40).
+                        
+                        const cells = Array.from({length:26},(_,i)=>{ const d=i-20; 
+                            let c=''; 
+                            if(d===-18) c='P'; 
+                            else if(d===-15) c='M'; 
+                            else if(d===-3) c='F'; 
+                            else if(d===0) c='E'; 
+                            else if(d===2) c='L';
+                            
+                            // Range Bar untuk Rekrutmen (H-15 s/d H-5)
+                            const isRecruitment = d >= -15 && d <= -5;
+                            
+                            // Warna dinamis berdasarkan status waktu
+                            let color = 'bg-slate-200'; // Default gray (future)
+                            if (d < diffDays) color = 'bg-green-500'; // Past (done)
+                            else if (d === diffDays) color = 'bg-blue-500 animate-pulse'; // Today
+                            
+                            // Override warna milestone spesifik jika belum lewat
+                            if (d >= diffDays) {
+                                if(c==='P') color='bg-slate-400';
+                                if(c==='M') color='bg-purple-400';
+                                if(c==='F') color='bg-yellow-400';
+                                if(c==='E') color='bg-blue-500';
+                                if(c==='L') color='bg-green-500';
+                                if(isRecruitment) color = 'bg-orange-200'; // Future recruitment
+                            } else {
+                                // Jika sudah lewat, biarkan hijau atau warna "selesai"
+                                if(isRecruitment) color = 'bg-green-200'; 
+                            }
 
-                return `
-                    <div class="min-w-[600px] text-sm">
-                        ${projectList.map(p => {
-                            if(!p.event_date) return '';
-                            const eventDate = new Date(p.event_date);
-                            const startDate = new Date(eventDate); startDate.setDate(startDate.getDate() - 20); // H-20
-                            const totalRange = 25; // 20 days before + 5 days after
-
-                            return `
-                                <div class="mb-3 border-b pb-2">
-                                    <div class="font-bold text-slate-700 mb-1 flex justify-between">
-                                        <span>${p.title}</span>
-                                        <span class="text-xs font-normal text-slate-500">${Core.formatDate(p.event_date)}</span>
-                                    </div>
-                                    <div class="relative h-6 bg-slate-100 rounded overflow-hidden">
-                                        ${milestones.map(m => {
-                                            // Simple positioning: (DayOffset + 20) / TotalRange * 100
-                                            const pos = ((m.days + 20) / totalRange) * 100;
-                                            return `<div class="absolute top-0 h-full w-4 ${m.color} text-[8px] text-white flex items-center justify-center rounded-sm" style="left: ${pos}%;" title="${m.name} (H${m.days})">${m.name[0]}</div>`;
-                                        }).join('')}
-                                    </div>
+                            // Tooltip Content
+                            const date = new Date(eventDate);
+                            date.setDate(date.getDate() + d);
+                            const dateStr = date.toLocaleDateString('id-ID', {day:'numeric', month:'short'});
+                            
+                            let content = '';
+                            if(c) content = `<div class="w-5 h-5 rounded-full text-[9px] text-white flex items-center justify-center ${color} shadow-sm z-10 relative">${c}</div>`;
+                            else if(isRecruitment) content = `<div class="h-2 w-full ${color} mt-1.5 rounded-full"></div>`;
+                            
+                            // Today Line Marker inside cell
+                            const isToday = d === diffDays;
+                            
+                            return `<div class="w-8 shrink-0 border-r h-8 flex flex-col items-center justify-center relative group gantt-cell">
+                                ${isToday ? '<div class="today-line"></div>' : ''}
+                                ${content}
+                                <div class="gantt-tooltip hidden absolute bottom-full mb-1 bg-slate-800 text-white text-[10px] p-1 rounded whitespace-nowrap z-20 shadow-lg">
+                                    ${dateStr} (H${d})
                                 </div>
-                            `;
-                        }).join('')}
-                        <div class="flex gap-2 text-xs text-slate-500 mt-2">
-                            <span class="flex items-center"><div class="w-2 h-2 bg-slate-400 mr-1"></div> Proposal</span>
-                            <span class="flex items-center"><div class="w-2 h-2 bg-purple-400 mr-1"></div> Media</span>
-                            <span class="flex items-center"><div class="w-2 h-2 bg-orange-400 mr-1"></div> Rekrutmen</span>
-                            <span class="flex items-center"><div class="w-2 h-2 bg-yellow-500 mr-1"></div> First Meet</span>
-                            <span class="flex items-center"><div class="w-2 h-2 bg-blue-500 mr-1"></div> Event</span>
-                            <span class="flex items-center"><div class="w-2 h-2 bg-green-500 mr-1"></div> Laporan</span>
-                        </div>
+                            </div>`;
+                        }).join('');
+                        
+                        return `<div class="flex items-center mb-2 border-b pb-2 hover:bg-slate-50 transition"><div class="w-40 shrink-0 pr-2 truncate text-sm font-bold">${p.title}</div><div class="flex">${cells}</div></div>`;
+                    }).join('')}
+                    <div class="mt-4 flex gap-4 text-xs text-slate-500 border-t pt-2">
+                        <div class="flex items-center"><div class="w-3 h-3 bg-red-500 mr-1 rounded-full"></div> Hari Ini</div>
+                        <div class="flex items-center"><div class="w-3 h-3 bg-green-500 mr-1 rounded-full"></div> Selesai</div>
+                        <div class="flex items-center"><div class="w-10 h-2 bg-orange-200 mr-1 rounded-full"></div> Rekrutmen</div>
                     </div>
-                `;
+                </div>`;
             }
         };
 
-        // --- MODULE 4: ADMIN VIEWS ---
+        // --- MODULE 4: ADMIN ---
         const AdminModule = {
-            renderApprovals: async (container) => {
-                const { data: approvals } = await Core.supabase.from('project_approvals').select('*, projects(title, regional)').eq('status', 'submitted');
-                
-                container.innerHTML = `
-                    <div class="fade-in">
-                        <h2 class="text-2xl font-bold mb-6">Approval List</h2>
-                        <div class="space-y-4">
-                            ${(!approvals || approvals.length === 0) ? '<div class="p-6 bg-white rounded-xl text-center text-slate-500">Tidak ada approval pending</div>' : ''}
-                            ${(approvals||[]).map(a => `
-                                <div class="bg-white p-5 rounded-xl border border-yellow-200 shadow-sm">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <h3 class="font-bold">${a.projects?.title || 'Unknown Project'}</h3>
-                                        <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Step ${a.step_number}</span>
-                                    </div>
-                                    <p class="text-sm text-slate-500 mb-4">Regional: ${a.projects?.regional}</p>
-                                    <div class="flex gap-2">
-                                        <button onclick="AdminModule.decide('${a.project_id}', ${a.step_number}, 'approved')" class="bg-green-600 text-white px-4 py-2 rounded text-xs font-bold">Approve</button>
-                                        <button onclick="AdminModule.decide('${a.project_id}', ${a.step_number}, 'rejected')" class="bg-red-600 text-white px-4 py-2 rounded text-xs font-bold">Reject</button>
-                                        <button onclick="UserModule.openProjectDetail('${a.project_id}', ${a.step_number})" class="bg-slate-100 text-slate-600 px-4 py-2 rounded text-xs font-bold">Lihat Detail</button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
+            renderApprovals: async (c) => {
+                const { data } = await Core.supabase.from('project_approvals').select('*, projects(title,regional)').eq('status','submitted');
+                c.innerHTML = `<h2 class="text-2xl font-bold mb-4">Approvals</h2><div class="space-y-4">${data?.length?data.map(a=>`<div class="bg-white p-4 rounded border shadow flex justify-between items-center"><div><h3 class="font-bold">${a.projects?.title}</h3><span class="bg-yellow-100 text-xs px-2 py-1 rounded">Step ${a.step_number}</span></div><div class="flex gap-2"><button onclick="AdminModule.decide('${a.project_id}',${a.step_number},'approved')" class="bg-green-600 text-white px-3 py-1 rounded">V</button><button onclick="AdminModule.decide('${a.project_id}',${a.step_number},'rejected')" class="bg-red-600 text-white px-3 py-1 rounded">X</button></div></div>`).join(''):'<p>No approvals.</p>'}</div>`;
             },
-
-            decide: async (pid, step, decision) => {
-                const update = { status: decision, notes: decision === 'rejected' ? 'Ditolak Admin' : '' };
-                if (decision === 'approved') update.approved_at = new Date();
-                
-                await Core.supabase.from('project_approvals').update(update).match({project_id: pid, step_number: step});
-                
-                // Update project status text if approved
-                if (decision === 'approved') {
-                    const stepInfo = Core.SOP_STEPS.find(s => s.id === step);
-                    if(stepInfo && stepInfo.nextStatus) {
-                        await Core.supabase.from('projects').update({status: stepInfo.nextStatus}).eq('id', pid);
-                    }
-                }
-
-                Core.showToast(`Step ${decision}`);
-                // Refresh logic depends on where we are
-                if (document.getElementById('nav-approvals').classList.contains('active')) {
-                    App.router('approvals');
-                } else {
-                    UserModule.openProjectDetail(pid, step);
-                }
-            },
-
-            renderUsers: (container) => {
-                container.innerHTML = `
-                    <div class="fade-in text-center py-20 bg-white rounded-xl border">
-                        <i class="fas fa-users text-4xl text-slate-300 mb-4"></i>
-                        <h3 class="text-lg font-bold text-slate-600">Manajemen User</h3>
-                        <p class="text-slate-500">Fitur ini akan segera hadir.</p>
-                    </div>
-                `;
-            }
+            decide: async (pid, step, status) => { await Core.supabase.from('project_approvals').update({status}).match({project_id:pid, step_number:step}); Core.showToast('Updated'); App.router('approvals'); }
         };
 
-        // --- MODULE 5: PDF SERVICE ---
+        // --- MODULE 5: PDF ENGINE ---
         const PDFService = {
             generate: async (pid) => {
+                Core.showToast('Menyiapkan PDF...');
                 const { data: p } = await Core.supabase.from('projects').select('*').eq('id', pid).single();
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
+                const { data: r } = await Core.supabase.from('rundowns').select('*').eq('project_id', pid);
+                const { data: b } = await Core.supabase.from('budgets').select('*').eq('project_id', pid);
+                const { data: g } = await Core.supabase.from('project_games').select('*').eq('project_id', pid);
 
-                doc.setFontSize(20);
-                doc.setTextColor(5, 150, 105);
-                doc.text(p.title, 105, 20, null, null, 'center');
+                const doc = new window.jspdf.jsPDF();
+                let y = 20; const line = (txt, sz=10, type='normal') => { doc.setFontSize(sz); doc.setFont(undefined, type); doc.text(txt, 15, y); y+=sz/2+2; };
+
+                // Header
+                doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Sankara NGO", 105, y, null, null, 'center'); y+=10;
+                doc.setTextColor(0); doc.setFontSize(10);
+                line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); line(`Regional: ${p.regional} | Leader: ${p.leader}`); y+=5;
+                doc.setDrawColor(200); doc.line(15,y,195,y); y+=8;
+
+                // Konsep & Games
+                line("Konsep Acara:", 12, 'bold');
+                const splitKonsep = doc.splitTextToSize(p.concept_note||'-', 180); doc.text(splitKonsep, 15, y); y+=splitKonsep.length*5+5;
                 
-                doc.setFontSize(12);
-                doc.setTextColor(0,0,0);
-                doc.text(`Regional: ${p.regional}`, 20, 40);
-                doc.text(`Leader: ${p.leader}`, 20, 50);
-                doc.text(`Tanggal: ${Core.formatDate(p.event_date)}`, 20, 60);
-
-                doc.text("Laporan Resmi Sankara NGO. Proyek telah selesai.", 20, 80);
-                
-                doc.save(`Laporan_${p.title}.pdf`);
-            }
-        };
-
-        // --- MODULE 6: MAIN APP CONTROLLER ---
-        const App = {
-            init: async () => {
-                Core.initSupabase();
-                Auth.init();
-                
-                // Sidebar highlighting logic
-                const btns = document.querySelectorAll('.sidebar-item');
-                btns.forEach(b => b.addEventListener('click', () => {
-                    btns.forEach(x => x.classList.remove('active'));
-                    b.classList.add('active');
-                }));
-
-                // Handle New Project Form
-                document.getElementById('form-project').addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.target);
-                    const d = Object.fromEntries(fd);
-                    delete d.id;
-                    await Core.supabase.from('projects').insert(d);
-                    Core.toggleModal('modal-project');
-                    Core.showToast('Proyek Dibuat');
-                    e.target.reset();
-                    App.router('projects');
-                });
-
-                // Default route
-                App.router('projects');
-            },
-
-            router: async (route) => {
-                const container = document.getElementById('content-area');
-                // Highlight sidebar
-                document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
-                const navBtn = document.getElementById(`nav-${route}`);
-                if(navBtn) navBtn.classList.add('active');
-
-                // Route logic
-                if (route === 'dashboard') {
-                    await UserModule.loadData();
-                    UserModule.renderDashboard(container);
-                } else if (route === 'projects') {
-                    await UserModule.loadData();
-                    UserModule.renderProjectList(container);
-                } else if (route === 'approvals') {
-                    if (!Auth.isAdmin()) return Core.showToast('Akses ditolak');
-                    AdminModule.renderApprovals(container);
-                } else if (route === 'users') {
-                    if (!Auth.isAdmin()) return Core.showToast('Akses ditolak');
-                    AdminModule.renderUsers(container);
+                if(g && g.length){
+                    line("Daftar Games & Edukasi:", 12, 'bold');
+                    g.forEach(gm => line(`- ${gm.title} (${gm.link||'-'})`)); y+=5;
                 }
+
+                // Tables
+                doc.autoTable({ startY: y, head: [['Item','Qty','Harga','Total']], body: [...b.map(x=>[x.item_name, x.quantity, Core.formatCurrency(x.unit_price), Core.formatCurrency(x.total_price)]), ['TOTAL','','', Core.formatCurrency(b.reduce((s,i)=>s+(i.total_price||0),0))]], theme: 'grid', headStyles: {fillColor:[22,163,74]} });
+                y = doc.lastAutoTable.finalY + 10;
+                
+                doc.autoTable({ startY: y, head: [['Waktu','Kegiatan']], body: r.map(x=>[`${x.time_start}-${x.time_end}`, x.activity]), theme: 'grid', headStyles: {fillColor:[22,163,74]} });
+                y = doc.lastAutoTable.finalY + 10;
+
+                // Images Helper
+                const addImg = async (url, title) => {
+                    if(!url) return;
+                    if(y > 200) { doc.addPage(); y=20; }
+                    line(title, 12, 'bold');
+                    try {
+                        const blob = await fetch(url.startsWith('http') ? url : `${Core.supabase.storageUrl}/object/public/evidence/${url}`).then(r=>r.blob());
+                        const base64 = await new Promise(r => { const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(blob); });
+                        doc.addImage(base64, 'JPEG', 15, y, 80, 60); y+=65;
+                    } catch(e) { line("(Gambar tidak dapat dimuat)", 10, 'italic'); }
+                };
+
+                await addImg(p.firstmeet_proof, "Bukti First Meet:");
+                await addImg(p.report_proof, "Foto Laporan Akhir:");
+
+                doc.save(`Laporan_${p.title}.pdf`);
+                Core.showToast('Download Selesai');
             }
         };
 
-        // Start App
+        // --- ROUTER ---
+        const App = {
+            init: () => { Core.initSupabase(); Auth.init(); App.router('projects'); },
+            router: (r) => {
+                const c = document.getElementById('content-area');
+                if(r==='dashboard'){ UserModule.loadData().then(()=>UserModule.renderDashboard(c)); }
+                if(r==='projects'){ UserModule.loadData().then(()=>UserModule.renderProjectList(c)); }
+                if(r==='approvals'){ AdminModule.renderApprovals(c); }
+            }
+        };
         document.addEventListener('DOMContentLoaded', App.init);
-
     </script>
 </body>
 </html>
