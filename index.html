@@ -313,7 +313,6 @@
                 if(!p) return App.router('projects');
 
                 const [rundowns, budgets, volunteers, approvals, games] = await Promise.all([
-                    // MODIFIED: Sorting by time_start for chronological order
                     Core.supabase.from('rundowns').select('*').eq('project_id', id).order('time_start', { ascending: true }),
                     Core.supabase.from('budgets').select('*').eq('project_id', id).order('id'),
                     Core.supabase.from('volunteers').select('*').eq('project_id', id),
@@ -324,7 +323,6 @@
                 UserModule.renderDetailView(container, p, { rundowns: rundowns.data, budgets: budgets.data, volunteers: volunteers.data, approvals: approvals.data, games: games.data }, stepId);
             },
 
-            // MODIFIED: Added Edit Button for Project Info
             renderDetailView: (container, p, r, activeStep) => {
                 const getStatus = (sid) => r.approvals.find(a => a.step_number === sid)?.status || 'pending';
                 const stepsHtml = Core.SOP_STEPS.map(s => {
@@ -344,8 +342,6 @@
                     </button>`;
                 }).join('');
 
-                // Prepare data for edit function
-                // MODIFIED: Added leader to json
                 const pJson = JSON.stringify({id: p.id, title: p.title, event_date: p.event_date, location: p.location, regional: p.regional, leader: p.leader}).replace(/"/g, '&quot;');
 
                 container.innerHTML = `
@@ -369,7 +365,6 @@
                     </div>`;
             },
 
-            // MODIFIED: Added openEditProjectModal with LEADER
             openEditProjectModal: (p) => {
                 const html = `
                     <form onsubmit="event.preventDefault(); UserModule.updateProjectDetails(this, '${p.id}')">
@@ -391,16 +386,14 @@
                 Core.openGenericModal('Edit Informasi Proyek', html);
             },
 
-            // MODIFIED: Added updateProjectDetails
             updateProjectDetails: async (form, pid) => {
                 const d = Object.fromEntries(new FormData(form));
                 const { error } = await Core.supabase.from('projects').update(d).eq('id', pid);
                 if (!error) {
                     Core.showToast('Informasi proyek diperbarui');
                     Core.toggleModal('modal-generic');
-                    // If we are in list view, refresh list. If in detail view, refresh detail.
                     if (UserModule.activeProjectId) {
-                         UserModule.openProjectDetail(pid, 1); // Just refresh, step 1 is fine or keep current
+                         UserModule.openProjectDetail(pid, 1); 
                     } else {
                          App.router('projects');
                     }
@@ -430,11 +423,28 @@
                 </div>`;
                 
                 if(sid === 1) {
+                    // MODIFIED: Render games list with edit and delete buttons
+                    const gameRows = (r.games||[]).map(g => {
+                        const gJson = JSON.stringify(g).replace(/"/g, '&quot;');
+                        return `<div class="flex justify-between items-center border-b pb-1">
+                            <div class="flex-1">
+                                <div class="font-medium">${g.title}</div>
+                                <div class="text-xs text-blue-500 truncate"><a href="${g.link}" target="_blank">${g.link||'-'}</a></div>
+                            </div>
+                            <div class="flex gap-1 ml-2">
+                                <button onclick="UserModule.editGame('${p.id}', ${gJson})" class="text-blue-500 hover:bg-blue-50 p-1 rounded"><i class="fas fa-edit"></i></button>
+                                <button onclick="UserModule.deleteItem('project_games', '${g.id}', '${p.id}')" class="text-red-500 hover:bg-red-50 p-1 rounded"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>`;
+                    }).join('');
+
                     body += `
                         <label class="text-xs font-bold text-slate-500">TARGET AUDIENCE</label><input value="${p.target_audience||''}" onchange="UserModule.updateField('${p.id}','target_audience',this.value)" class="w-full border p-2 rounded mb-2">
                         <label class="text-xs font-bold text-slate-500">KONSEP ACARA</label><textarea onchange="UserModule.updateField('${p.id}','concept_note',this.value)" class="w-full border p-2 rounded mb-4" rows="4">${p.concept_note||''}</textarea>
                         <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Games & Referensi</h4><button onclick="UserModule.addItemModal('project_games','${p.id}')" class="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">+ Tambah</button></div>
-                        <div class="bg-slate-50 p-3 rounded border mb-4 text-sm">${(r.games||[]).map(g => `<div>- <b>${g.title}</b> (${g.link||'-'})</div>`).join('')}</div>
+                        <div class="bg-slate-50 p-3 rounded border mb-4 text-sm space-y-2">
+                            ${gameRows.length ? gameRows : '<div class="text-slate-400 italic">Belum ada games/referensi</div>'}
+                        </div>
                     `;
                 } else if (sid === 2) {
                     const total = (r.budgets||[]).reduce((a,b)=>a+(b.total_price||0),0);
@@ -571,6 +581,23 @@
                 Core.openGenericModal('Edit Budget', html);
             },
 
+            // MODIFIED: Added editGame function
+            editGame: (pid, item) => {
+                const html = `
+                    <form onsubmit="event.preventDefault(); UserModule.saveItem('project_games', '${pid}', this)">
+                        <input type="hidden" name="id" value="${item.id}">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">NAMA GAME / AKTIVITAS</label>
+                        <input name="title" value="${item.title}" class="w-full border p-2 rounded mb-3" required>
+                        
+                        <label class="block text-xs font-bold text-slate-500 mb-1">LINK REFERENSI</label>
+                        <input name="link" value="${item.link || ''}" class="w-full border p-2 rounded mb-4" placeholder="https://...">
+                        
+                        <button class="w-full bg-blue-600 text-white py-2 rounded font-bold">Update Game</button>
+                    </form>
+                `;
+                Core.openGenericModal('Edit Game', html);
+            },
+
             calcTotal: (form) => {
                 const q = parseFloat(form.quantity.value) || 0;
                 const p = parseFloat(form.unit_price.value) || 0;
@@ -614,7 +641,12 @@
             deleteItem: async (table, id, pid) => {
                 if(!confirm('Hapus item ini?')) return;
                 await Core.supabase.from(table).delete().eq('id', id);
-                UserModule.openProjectDetail(pid, table==='budgets'||table==='rundowns'?2:3);
+                // MODIFIED: Redirect logic for project_games
+                let step = 2;
+                if (table === 'volunteers') step = 3;
+                if (table === 'project_games') step = 1; // Explicitly set step 1 for games
+                
+                UserModule.openProjectDetail(pid, step);
             },
 
             deleteProject: async (id) => {
@@ -730,11 +762,10 @@
                     let y = 20; const line = (txt, sz=10, type='normal') => { doc.setFontSize(sz); doc.setFont(undefined, type); doc.text(txt, 15, y); y+=sz/2+2; };
 
                     // Header
-                    doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Regional Sankara", 105, y, null, null, 'center'); y+=10;
+                    doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Sankara NGO", 105, y, null, null, 'center'); y+=10;
                     doc.setTextColor(0); doc.setFontSize(10);
                     line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); 
                     line(`Regional: ${p.regional} | Leader: ${p.leader}`); 
-                    // MODIFIED: Added Target Audience
                     line(`Target Audience: ${p.target_audience || '-'}`);
                     y+=5;
                     doc.setDrawColor(200); doc.line(15,y,195,y); y+=8;
