@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
@@ -80,6 +82,69 @@
         .login-modal {
             backdrop-filter: blur(8px);
         }
+
+        /* PDF Export Styles */
+        .pdf-export {
+            background: white;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .pdf-header {
+            text-align: center;
+            border-bottom: 3px solid #059669;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .pdf-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #059669;
+            margin-bottom: 10px;
+        }
+        .pdf-subtitle {
+            font-size: 16px;
+            color: #64748b;
+        }
+        .pdf-section {
+            margin-bottom: 25px;
+        }
+        .pdf-section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #059669;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        .pdf-table th {
+            background-color: #f1f5f9;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #e2e8f0;
+        }
+        .pdf-table td {
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        .pdf-total {
+            font-weight: bold;
+            background-color: #f0fdf4;
+        }
+        .pdf-footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            color: #64748b;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen flex overflow-hidden">
@@ -103,19 +168,26 @@
                     <label class="block text-sm font-medium text-slate-700 mb-2">Email Admin</label>
                     <input type="email" id="login-email" required 
                            class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
-                           placeholder="Masukkan email admin">
+                           placeholder="admin@sankara.org">
                 </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
                     <input type="password" id="login-password" required 
                            class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
-                           placeholder="Masukkan password">
+                           placeholder="admin123">
                 </div>
                 
                 <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-green-200">
                     Masuk sebagai Admin
                 </button>
+
+                <!-- Demo credentials -->
+                <div class="text-xs text-slate-500 text-center mt-4 p-3 bg-slate-50 rounded-lg">
+                    <strong>Demo Admin:</strong><br>
+                    Email: admin@sankara.org<br>
+                    Password: admin123
+                </div>
             </form>
         </div>
     </div>
@@ -260,6 +332,27 @@
                 <div id="modal-generic-content" class="p-6"></div>
             </div>
         </div>
+
+        <!-- PDF Export Modal -->
+        <div id="modal-pdf" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden max-h-[90vh] flex flex-col">
+                <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-slate-800">Export Laporan Proyek</h3>
+                    <button onclick="app.toggleModal('modal-pdf')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="modal-pdf-content" class="p-6 overflow-y-auto flex-1">
+                    <!-- PDF content will be generated here -->
+                </div>
+                <div class="bg-slate-50 px-6 py-4 border-t flex justify-end gap-3">
+                    <button onclick="app.toggleModal('modal-pdf')" class="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg font-bold hover:bg-slate-300 transition">
+                        Batal
+                    </button>
+                    <button onclick="app.downloadPDF()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 transition flex items-center">
+                        <i class="fas fa-download mr-2"></i> Download PDF
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -336,6 +429,18 @@
             REJECTED: 'rejected'
         };
 
+        // Default admin credentials (fallback jika tabel users tidak ada)
+        const DEFAULT_ADMINS = [
+            {
+                id: 1,
+                name: 'Admin Sankara',
+                email: 'admin@sankara.org',
+                password: 'admin123',
+                role: 'admin',
+                regional: 'All Regional'
+            }
+        ];
+
         const app = {
             currentUser: null,
             currentPage: 'projects',
@@ -347,6 +452,7 @@
             projectFilterRegion: 'all',
             projectApprovals: {},
             isLoading: false,
+            currentPDFData: null,
             
             init: async () => {
                 console.log('App initializing...');
@@ -449,29 +555,46 @@
                 submitBtn.disabled = true;
                 
                 try {
-                    // Simple authentication
-                    const { data: users, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('email', email)
-                        .eq('password', password)
-                        .single();
+                    let user = null;
                     
-                    if (error || !users) {
+                    // Coba ambil dari database terlebih dahulu
+                    try {
+                        const { data: users, error } = await supabase
+                            .from('users')
+                            .select('*')
+                            .eq('email', email)
+                            .eq('password', password)
+                            .single();
+                        
+                        if (!error && users) {
+                            user = users;
+                        }
+                    } catch (dbError) {
+                        console.log('Database error, using default admin:', dbError);
+                    }
+                    
+                    // Jika tidak ada di database, gunakan default admin
+                    if (!user) {
+                        user = DEFAULT_ADMINS.find(u => 
+                            u.email === email && u.password === password
+                        );
+                    }
+                    
+                    if (!user) {
                         app.showToast("Email atau password admin salah");
                         return;
                     }
                     
-                    if (users.role !== 'admin') {
+                    if (user.role !== 'admin') {
                         app.showToast("Hanya admin yang dapat login");
                         return;
                     }
                     
-                    app.currentUser = users;
-                    localStorage.setItem('sankara_admin', JSON.stringify(users));
+                    app.currentUser = user;
+                    localStorage.setItem('sankara_admin', JSON.stringify(user));
                     await app.updateUIForAdmin();
                     app.toggleModal('login-modal');
-                    app.showToast(`Selamat datang, Admin ${users.name}!`);
+                    app.showToast(`Selamat datang, Admin ${user.name}!`);
                     
                     // Clear login form
                     document.getElementById('login-form').reset();
@@ -687,29 +810,51 @@
             },
 
             updateStepApproval: async (projectId, stepNumber, newStatus, notes = '') => {
-                if (!app.hasPermission('approve_project')) {
-                    app.showToast("Hanya admin yang dapat menyetujui proyek");
+                // PERBAIKAN: Hanya cek permission untuk approve/reject, bukan untuk submit
+                if ((newStatus === APPROVAL_STATUS.APPROVED || newStatus === APPROVAL_STATUS.REJECTED) && 
+                    !app.hasPermission('approve_project')) {
+                    app.showToast("Hanya admin yang dapat menyetujui/menolak proyek");
                     return;
                 }
 
                 try {
+                    const updateData = {
+                        project_id: projectId,
+                        step_number: stepNumber,
+                        status: newStatus,
+                        submitted_at: new Date().toISOString()
+                    };
+
+                    // Tambahkan approved_at hanya jika status approved
+                    if (newStatus === APPROVAL_STATUS.APPROVED) {
+                        updateData.approved_at = new Date().toISOString();
+                    }
+
+                    // Tambahkan notes jika ada
+                    if (notes) {
+                        updateData.notes = notes;
+                    }
+
                     const { error } = await supabase
                         .from('project_approvals')
-                        .upsert([
-                            {
-                                project_id: projectId,
-                                step_number: stepNumber,
-                                status: newStatus,
-                                approved_at: newStatus === APPROVAL_STATUS.APPROVED ? new Date().toISOString() : null,
-                                notes: notes
-                            }
-                        ]);
+                        .upsert([updateData]);
                     
                     if (error) {
                         app.showToast("Gagal update approval: " + error.message);
                     } else {
-                        app.showToast(`Step berhasil ${newStatus === APPROVAL_STATUS.APPROVED ? 'disetujui' : 'ditolak'}`);
+                        const statusText = newStatus === APPROVAL_STATUS.APPROVED ? 'disetujui' : 
+                                          newStatus === APPROVAL_STATUS.REJECTED ? 'ditolak' : 'diajukan';
+                        app.showToast(`Step berhasil ${statusText}`);
                         app.projectApprovals[projectId] = await app.fetchProjectApprovals(projectId);
+                        
+                        // Jika step 6 disetujui, update status proyek menjadi selesai
+                        if (newStatus === APPROVAL_STATUS.APPROVED && stepNumber === 6) {
+                            await supabase
+                                .from('projects')
+                                .update({ status: 'Tahap 6: Laporan - Selesai' })
+                                .eq('id', projectId);
+                        }
+                        
                         app.getProjectDetails(projectId, stepNumber);
                     }
                 } catch (error) {
@@ -723,13 +868,9 @@
                 
                 console.log('Showing page:', pageName);
                 
-                if (pageName === 'approvals' && !app.hasPermission('manage_users')) {
-                    app.showToast("Hanya admin yang dapat mengakses halaman approval");
-                    return;
-                }
-
-                if (pageName === 'users' && !app.hasPermission('manage_users')) {
-                    app.showToast("Hanya admin yang dapat mengakses halaman user management");
+                // PERBAIKAN: Permission check yang lebih baik
+                if ((pageName === 'approvals' || pageName === 'users') && !app.hasPermission('manage_users')) {
+                    app.showToast("Hanya admin yang dapat mengakses halaman ini");
                     return;
                 }
 
@@ -780,7 +921,7 @@
                 }
             },
 
-            // PERBAIKAN: Fungsi renderProjectDetailView yang lengkap
+            // PERBAIKAN: Fungsi renderProjectDetailView dengan permission yang benar
             renderProjectDetailView: (project, rundowns, budgets, volunteers, files, currentStatusStep) => {
                 const container = document.getElementById('content-area');
                 if (!container) return;
@@ -788,6 +929,7 @@
                 // Cek apakah step saat ini bisa diakses
                 const canAccessCurrentStep = app.isPreviousStepApproved(project.id, app.activeStepTab);
                 const currentStepStatus = app.getStepStatus(project.id, app.activeStepTab);
+                const isAdmin = app.hasPermission('approve_project');
                 
                 let stepContent = '';
                 let validationError = '';
@@ -830,10 +972,23 @@
                                     </button>
                                 ` : ''}
                                 
-                                ${stepStatus === APPROVAL_STATUS.SUBMITTED ? `
+                                ${stepStatus === APPROVAL_STATUS.SUBMITTED && isAdmin ? `
+                                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                        <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval Admin</h4>
+                                        <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan admin.</p>
+                                        <div class="flex gap-2 mt-3">
+                                            <button onclick="app.updateStepApproval('${project.id}', 1, '${APPROVAL_STATUS.APPROVED}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold">
+                                                Setujui
+                                            </button>
+                                            <button onclick="app.openRejectModal('${project.id}', 1)" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold">
+                                                Tolak
+                                            </button>
+                                        </div>
+                                    </div>
+                                ` : stepStatus === APPROVAL_STATUS.SUBMITTED ? `
                                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
                                         <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval</h4>
-                                        <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan.</p>
+                                        <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan admin.</p>
                                     </div>
                                 ` : ''}
                                 
@@ -960,10 +1115,23 @@
                                 </button>
                             ` : ''}
                             
-                            ${stepStatus === APPROVAL_STATUS.SUBMITTED ? `
+                            ${stepStatus === APPROVAL_STATUS.SUBMITTED && isAdmin ? `
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                    <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval Admin</h4>
+                                    <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan admin.</p>
+                                    <div class="flex gap-2 mt-3">
+                                        <button onclick="app.updateStepApproval('${project.id}', 2, '${APPROVAL_STATUS.APPROVED}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold">
+                                            Setujui
+                                        </button>
+                                        <button onclick="app.openRejectModal('${project.id}', 2)" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold">
+                                            Tolak
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : stepStatus === APPROVAL_STATUS.SUBMITTED ? `
                                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
                                     <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval</h4>
-                                    <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan.</p>
+                                    <p class="text-sm text-yellow-700">Step ini sudah diajukan dan menunggu persetujuan admin.</p>
                                 </div>
                             ` : ''}
                             
@@ -1095,6 +1263,7 @@
                 // Step 6: Laporan
                 else if(app.activeStepTab === 6) {
                     const stepStatus = app.getStepStatus(project.id, 6);
+                    const isProjectCompleted = stepStatus === APPROVAL_STATUS.APPROVED;
                     
                     stepContent = `
                         <div class="bg-white rounded-2xl p-6 border border-slate-200 fade-in">
@@ -1118,10 +1287,23 @@
                                     </button>
                                 ` : ''}
                                 
-                                ${stepStatus === APPROVAL_STATUS.SUBMITTED ? `
+                                ${stepStatus === APPROVAL_STATUS.SUBMITTED && isAdmin ? `
+                                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                        <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval Admin</h4>
+                                        <p class="text-sm text-yellow-700">Laporan sudah diajukan dan menunggu persetujuan admin.</p>
+                                        <div class="flex gap-2 mt-3">
+                                            <button onclick="app.updateStepApproval('${project.id}', 6, '${APPROVAL_STATUS.APPROVED}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold">
+                                                Setujui
+                                            </button>
+                                            <button onclick="app.openRejectModal('${project.id}', 6)" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold">
+                                                Tolak
+                                            </button>
+                                        </div>
+                                    </div>
+                                ` : stepStatus === APPROVAL_STATUS.SUBMITTED ? `
                                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
                                         <h4 class="font-bold text-yellow-800 mb-2">Menunggu Approval</h4>
-                                        <p class="text-sm text-yellow-700">Laporan sudah diajukan dan menunggu persetujuan.</p>
+                                        <p class="text-sm text-yellow-700">Laporan sudah diajukan dan menunggu persetujuan admin.</p>
                                     </div>
                                 ` : ''}
                                 
@@ -1135,11 +1317,14 @@
                                     </div>
                                 ` : ''}
                                 
-                                ${stepStatus === APPROVAL_STATUS.APPROVED ? `
-                                    <div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold">
+                                ${isProjectCompleted ? `
+                                    <div class="bg-green-50 text-green-800 p-4 rounded-xl border border-green-200 text-center font-bold mb-4">
                                         <i class="fas fa-trophy text-xl mb-2 block"></i> 
                                         Proyek Selesai!
                                     </div>
+                                    <button onclick="app.exportToPDF('${project.id}')" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-lg shadow-red-200 transition flex items-center justify-center">
+                                        <i class="fas fa-file-pdf mr-2"></i> Export Laporan PDF
+                                    </button>
                                 ` : ''}
                             </div>
                         </div>`;
@@ -1201,6 +1386,13 @@
                                     <i class="fas fa-map-marker-alt mr-1"></i> ${project.location || 'Unknown Location'}
                                 </p>
                             </div>
+                            ${currentStatusStep === 6 && app.getStepStatus(project.id, 6) === APPROVAL_STATUS.APPROVED ? `
+                                <div>
+                                    <button onclick="app.exportToPDF('${project.id}')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold flex items-center">
+                                        <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                                    </button>
+                                </div>
+                            ` : ''}
                         </div>
                         
                         ${validationError}
@@ -1228,6 +1420,504 @@
                 `;
                 
                 container.innerHTML = html;
+            },
+
+            // Fungsi untuk export PDF
+            exportToPDF: async (projectId) => {
+                try {
+                    app.isLoading = true;
+                    
+                    // Get project data dengan semua relasinya
+                    const { data: project, error: projectError } = await supabase
+                        .from('projects')
+                        .select('*')
+                        .eq('id', projectId)
+                        .single();
+
+                    if (projectError) throw projectError;
+
+                    const [rundowns, budgets, volunteers] = await Promise.all([
+                        supabase.from('rundowns').select('*').eq('project_id', projectId),
+                        supabase.from('budgets').select('*').eq('project_id', projectId),
+                        supabase.from('volunteers').select('*').eq('project_id', projectId)
+                    ]);
+
+                    // Simpan data untuk PDF
+                    app.currentPDFData = {
+                        project,
+                        rundowns: rundowns.data || [],
+                        budgets: budgets.data || [],
+                        volunteers: volunteers.data || []
+                    };
+
+                    // Generate preview PDF
+                    app.generatePDFPreview();
+                    
+                    // Tampilkan modal PDF
+                    app.toggleModal('modal-pdf');
+                    
+                } catch (error) {
+                    console.error('Error exporting to PDF:', error);
+                    app.showToast('Error membuat laporan PDF: ' + error.message);
+                } finally {
+                    app.isLoading = false;
+                }
+            },
+
+            generatePDFPreview: () => {
+                const container = document.getElementById('modal-pdf-content');
+                if (!container || !app.currentPDFData) return;
+
+                const { project, rundowns, budgets, volunteers } = app.currentPDFData;
+                const totalBudget = budgets.reduce((sum, b) => sum + (parseFloat(b.total_price) || 0), 0);
+
+                container.innerHTML = `
+                    <div class="pdf-export">
+                        <div class="pdf-header">
+                            <div class="pdf-title">${project.title || 'Laporan Proyek'}</div>
+                            <div class="pdf-subtitle">SANKARA NGO - ${project.regional || ''}</div>
+                        </div>
+
+                        <div class="pdf-section">
+                            <div class="pdf-section-title">Informasi Umum</div>
+                            <table class="pdf-table">
+                                <tr>
+                                    <td width="30%"><strong>Nama Kegiatan</strong></td>
+                                    <td>${project.title || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Regional</strong></td>
+                                    <td>${project.regional || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Leader</strong></td>
+                                    <td>${project.leader || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tema</strong></td>
+                                    <td>${project.theme || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tanggal</strong></td>
+                                    <td>${app.formatDate(project.event_date)}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Lokasi</strong></td>
+                                    <td>${project.location || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target Panti/Fasilitas</strong></td>
+                                    <td>${project.target_audience || '-'}</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="pdf-section">
+                            <div class="pdf-section-title">Rencana Anggaran Biaya (RAB)</div>
+                            <table class="pdf-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40%">Item</th>
+                                        <th width="20%">Quantity</th>
+                                        <th width="20%">Harga Satuan</th>
+                                        <th width="20%">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${budgets.map(b => `
+                                        <tr>
+                                            <td>${b.item_name || '-'}</td>
+                                            <td>${b.quantity || '0'}</td>
+                                            <td>${app.formatCurrency(parseFloat(b.unit_price) || 0)}</td>
+                                            <td>${app.formatCurrency(parseFloat(b.total_price) || 0)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="pdf-total">
+                                        <td colspan="3" align="right"><strong>Total RAB</strong></td>
+                                        <td><strong>${app.formatCurrency(totalBudget)}</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        ${rundowns.length > 0 ? `
+                        <div class="pdf-section">
+                            <div class="pdf-section-title">Rundown Kegiatan</div>
+                            <table class="pdf-table">
+                                <thead>
+                                    <tr>
+                                        <th width="30%">Waktu</th>
+                                        <th width="70%">Kegiatan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rundowns.map(r => `
+                                        <tr>
+                                            <td>${r.time_start || ''} - ${r.time_end || ''}</td>
+                                            <td>${r.activity || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        ` : ''}
+
+                        ${volunteers.length > 0 ? `
+                        <div class="pdf-section">
+                            <div class="pdf-section-title">Struktur Relawan</div>
+                            <table class="pdf-table">
+                                <thead>
+                                    <tr>
+                                        <th width="70%">Divisi/Role</th>
+                                        <th width="30%">Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${volunteers.map(v => `
+                                        <tr>
+                                            <td>${v.role_name || '-'}</td>
+                                            <td>${v.count || '0'} Orang</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        ` : ''}
+
+                        ${project.concept_note ? `
+                        <div class="pdf-section">
+                            <div class="pdf-section-title">Konsep Acara</div>
+                            <div style="padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                ${project.concept_note}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${project.report_content ? `
+                        <div class="pdf-section">
+                            <div class="pdf-section-title">Ringkasan Laporan</div>
+                            <div style="padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                ${project.report_content}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <div class="pdf-footer">
+                            <p>Dibuat oleh SANKARA Project Management System</p>
+                            <p>${new Date().toLocaleDateString('id-ID')} - ${new Date().toLocaleTimeString('id-ID')}</p>
+                        </div>
+                    </div>
+                `;
+            },
+
+            downloadPDF: () => {
+                if (!app.currentPDFData) return;
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const { project, budgets, rundowns, volunteers } = app.currentPDFData;
+                const totalBudget = budgets.reduce((sum, b) => sum + (parseFloat(b.total_price) || 0), 0);
+
+                // Set judul
+                doc.setFontSize(20);
+                doc.setTextColor(5, 150, 105);
+                doc.text(project.title || 'Laporan Proyek', 105, 20, { align: 'center' });
+                
+                doc.setFontSize(12);
+                doc.setTextColor(100, 116, 139);
+                doc.text(`SANKARA NGO - ${project.regional || ''}`, 105, 28, { align: 'center' });
+
+                let yPosition = 45;
+
+                // Informasi Umum
+                doc.setFontSize(16);
+                doc.setTextColor(5, 150, 105);
+                doc.text('Informasi Umum', 14, yPosition);
+                yPosition += 10;
+
+                doc.setFontSize(10);
+                doc.setTextColor(0, 0, 0);
+                
+                const generalInfo = [
+                    ['Nama Kegiatan', project.title || '-'],
+                    ['Regional', project.regional || '-'],
+                    ['Leader', project.leader || '-'],
+                    ['Tema', project.theme || '-'],
+                    ['Tanggal', app.formatDate(project.event_date)],
+                    ['Lokasi', project.location || '-'],
+                    ['Target Panti/Fasilitas', project.target_audience || '-']
+                ];
+
+                generalInfo.forEach(([label, value]) => {
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`${label}:`, 20, yPosition);
+                    doc.setFont(undefined, 'normal');
+                    const lines = doc.splitTextToSize(value, 120);
+                    doc.text(lines, 70, yPosition);
+                    yPosition += lines.length * 7;
+                });
+
+                yPosition += 5;
+
+                // RAB
+                if (budgets.length > 0) {
+                    if (yPosition > 250) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+
+                    doc.setFontSize(16);
+                    doc.setTextColor(5, 150, 105);
+                    doc.text('Rencana Anggaran Biaya (RAB)', 14, yPosition);
+                    yPosition += 10;
+
+                    const tableHeaders = [['Item', 'Qty', 'Harga', 'Total']];
+                    const tableData = budgets.map(b => [
+                        b.item_name || '-',
+                        b.quantity || '0',
+                        app.formatCurrency(parseFloat(b.unit_price) || 0),
+                        app.formatCurrency(parseFloat(b.total_price) || 0)
+                    ]);
+
+                    tableData.push(['TOTAL RAB', '', '', app.formatCurrency(totalBudget)]);
+
+                    doc.autoTable({
+                        startY: yPosition,
+                        head: tableHeaders,
+                        body: tableData,
+                        theme: 'grid',
+                        headStyles: { fillColor: [5, 150, 105] },
+                        styles: { fontSize: 8 },
+                        columnStyles: {
+                            0: { cellWidth: 80 },
+                            1: { cellWidth: 20 },
+                            2: { cellWidth: 35 },
+                            3: { cellWidth: 35 }
+                        }
+                    });
+
+                    yPosition = doc.lastAutoTable.finalY + 10;
+                }
+
+                // Rundown
+                if (rundowns.length > 0) {
+                    if (yPosition > 250) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+
+                    doc.setFontSize(16);
+                    doc.setTextColor(5, 150, 105);
+                    doc.text('Rundown Kegiatan', 14, yPosition);
+                    yPosition += 10;
+
+                    const rundownData = rundowns.map(r => [
+                        `${r.time_start || ''} - ${r.time_end || ''}`,
+                        r.activity || '-'
+                    ]);
+
+                    doc.autoTable({
+                        startY: yPosition,
+                        head: [['Waktu', 'Kegiatan']],
+                        body: rundownData,
+                        theme: 'grid',
+                        headStyles: { fillColor: [5, 150, 105] },
+                        styles: { fontSize: 8 },
+                        columnStyles: {
+                            0: { cellWidth: 40 },
+                            1: { cellWidth: 130 }
+                        }
+                    });
+
+                    yPosition = doc.lastAutoTable.finalY + 10;
+                }
+
+                // Footer
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(
+                        `Dibuat oleh SANKARA Project Management System - Halaman ${i} dari ${pageCount}`,
+                        105,
+                        290,
+                        { align: 'center' }
+                    );
+                }
+
+                // Download PDF
+                const fileName = `Laporan_${project.title.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+                doc.save(fileName);
+                
+                app.showToast('PDF berhasil diunduh!');
+                app.toggleModal('modal-pdf');
+            },
+
+            // PERBAIKAN: Fungsi renderApprovalsPage yang benar
+            renderApprovalsPage: async (container) => {
+                if (!app.hasPermission('manage_users')) {
+                    container.innerHTML = `
+                        <div class="flex flex-col justify-center items-center h-full text-red-600">
+                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                            <p class="text-lg font-bold">Akses Ditolak</p>
+                            <p class="text-sm mt-2">Hanya admin yang dapat mengakses halaman ini</p>
+                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
+                                Kembali ke Proyek
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                try {
+                    // Get all projects with their approvals
+                    const pendingApprovals = [];
+                    
+                    for (const project of app.projects) {
+                        const approvals = await app.fetchProjectApprovals(project.id);
+                        const pendingSteps = approvals.filter(a => a.status === APPROVAL_STATUS.SUBMITTED);
+                        
+                        if (pendingSteps.length > 0) {
+                            pendingApprovals.push({
+                                project,
+                                pendingSteps
+                            });
+                        }
+                    }
+
+                    container.innerHTML = `
+                        <div class="page-transition">
+                            <h2 class="text-2xl font-bold mb-6">Approval Proyek</h2>
+                            
+                            ${pendingApprovals.length === 0 ? `
+                                <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
+                                    <i class="fas fa-check-circle text-4xl text-green-300 mb-4"></i>
+                                    <h3 class="text-lg font-bold text-slate-600 mb-2">Tidak ada approval tertunda</h3>
+                                    <p class="text-slate-500">Semua proyek sudah diproses</p>
+                                </div>
+                            ` : `
+                                <div class="space-y-4">
+                                    ${pendingApprovals.map(item => `
+                                        <div class="bg-white rounded-xl border shadow-sm p-6">
+                                            <div class="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <h3 class="font-bold text-lg">${item.project.title}</h3>
+                                                    <p class="text-slate-600 text-sm">${item.project.regional} • ${app.formatDate(item.project.event_date)}</p>
+                                                </div>
+                                                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold">
+                                                    ${item.pendingSteps.length} Step Menunggu
+                                                </span>
+                                            </div>
+                                            
+                                            <div class="space-y-3">
+                                                ${item.pendingSteps.map(step => {
+                                                    const stepInfo = SOP_STEPS.find(s => s.id === step.step_number);
+                                                    return `
+                                                        <div class="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
+                                                            <div>
+                                                                <h4 class="font-bold text-slate-800">${stepInfo?.name || `Step ${step.step_number}`}</h4>
+                                                                <p class="text-sm text-slate-600">${stepInfo?.desc || ''}</p>
+                                                                <p class="text-xs text-slate-500">Diajukan: ${new Date(step.submitted_at).toLocaleDateString('id-ID')}</p>
+                                                            </div>
+                                                            <div class="flex gap-2">
+                                                                <button onclick="app.updateStepApproval('${item.project.id}', ${step.step_number}, '${APPROVAL_STATUS.APPROVED}')" 
+                                                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                                                    Setujui
+                                                                </button>
+                                                                <button onclick="app.openRejectModal('${item.project.id}', ${step.step_number})" 
+                                                                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                                                    Tolak
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    `;
+                                                }).join('')}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `}
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('Error rendering approvals page:', error);
+                    container.innerHTML = `
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                            <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-3"></i>
+                            <h3 class="text-lg font-bold text-red-800 mb-2">Error Memuat Data</h3>
+                            <p class="text-red-600">${error.message}</p>
+                        </div>
+                    `;
+                }
+            },
+
+            renderUsersPage: async (container) => {
+                if (!app.hasPermission('manage_users')) {
+                    container.innerHTML = `
+                        <div class="flex flex-col justify-center items-center h-full text-red-600">
+                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                            <p class="text-lg font-bold">Akses Ditolak</p>
+                            <p class="text-sm mt-2">Hanya admin yang dapat mengakses halaman ini</p>
+                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
+                                Kembali ke Proyek
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="page-transition">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold">Manajemen User</h2>
+                            <button onclick="app.openUserModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                                + Tambah User
+                            </button>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
+                            <i class="fas fa-users text-4xl text-slate-300 mb-4"></i>
+                            <h3 class="text-lg font-bold text-slate-600 mb-2">Fitur Manajemen User</h3>
+                            <p class="text-slate-500 mb-4">Fitur ini akan segera hadir dalam update berikutnya</p>
+                            <p class="text-sm text-slate-400">Untuk sementara, gunakan default admin account</p>
+                        </div>
+                    </div>
+                `;
+            },
+
+            openRejectModal: (projectId, stepNumber) => {
+                app.openGeneric(
+                    "Tolak Approval",
+                    `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleRejectApproval(this, '${projectId}', ${stepNumber})">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Alasan Penolakan</label>
+                            <textarea name="notes" placeholder="Berikan alasan penolakan..." class="w-full border p-2 rounded" rows="3" required></textarea>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="app.toggleModal('modal-generic')" class="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold">
+                                Batal
+                            </button>
+                            <button type="submit" class="flex-1 bg-red-600 text-white py-2 rounded font-bold">
+                                Tolak
+                            </button>
+                        </div>
+                    </form>`
+                );
+            },
+
+            handleRejectApproval: async (form, projectId, stepNumber) => {
+                const formData = new FormData(form);
+                const notes = formData.get('notes');
+                
+                await app.updateStepApproval(projectId, stepNumber, APPROVAL_STATUS.REJECTED, notes);
+                app.toggleModal('modal-generic');
+            },
+
+            openUserModal: () => {
+                app.showToast("Fitur tambah user akan segera hadir");
             },
 
             // Helper functions untuk status
@@ -1559,289 +2249,6 @@
                         `}
                     </div>
                 `;
-            },
-
-            renderApprovalsPage: async (container) => {
-                if (!app.hasPermission('manage_users')) {
-                    container.innerHTML = `
-                        <div class="flex flex-col justify-center items-center h-full text-red-600">
-                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                            <p class="text-lg font-bold">Akses Ditolak</p>
-                            <p class="text-sm mt-2">Hanya admin yang dapat mengakses halaman ini</p>
-                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
-                                Kembali ke Proyek
-                            </button>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // Get projects waiting for approval
-                const pendingApprovals = [];
-                for (const project of app.projects) {
-                    const approvals = await app.fetchProjectApprovals(project.id);
-                    const pendingSteps = approvals.filter(a => a.status === APPROVAL_STATUS.SUBMITTED);
-                    
-                    if (pendingSteps.length > 0) {
-                        pendingApprovals.push({
-                            project,
-                            pendingSteps
-                        });
-                    }
-                }
-
-                container.innerHTML = `
-                    <div class="page-transition">
-                        <h2 class="text-2xl font-bold mb-6">Approval Proyek</h2>
-                        
-                        ${pendingApprovals.length === 0 ? `
-                            <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
-                                <i class="fas fa-check-circle text-4xl text-green-300 mb-4"></i>
-                                <h3 class="text-lg font-bold text-slate-600 mb-2">Tidak ada approval tertunda</h3>
-                                <p class="text-slate-500">Semua proyek sudah diproses</p>
-                            </div>
-                        ` : `
-                            <div class="space-y-4">
-                                ${pendingApprovals.map(item => `
-                                    <div class="bg-white rounded-xl border shadow-sm p-6">
-                                        <div class="flex justify-between items-start mb-4">
-                                            <div>
-                                                <h3 class="font-bold text-lg">${item.project.title}</h3>
-                                                <p class="text-slate-600 text-sm">${item.project.regional} • ${app.formatDate(item.project.event_date)}</p>
-                                            </div>
-                                            <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold">
-                                                ${item.pendingSteps.length} Step Menunggu
-                                            </span>
-                                        </div>
-                                        
-                                        <div class="space-y-3">
-                                            ${item.pendingSteps.map(step => {
-                                                const stepInfo = SOP_STEPS.find(s => s.id === step.step_number);
-                                                return `
-                                                    <div class="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
-                                                        <div>
-                                                            <h4 class="font-bold text-slate-800">${stepInfo?.name || `Step ${step.step_number}`}</h4>
-                                                            <p class="text-sm text-slate-600">${stepInfo?.desc || ''}</p>
-                                                            <p class="text-xs text-slate-500">Diajukan: ${new Date(step.submitted_at).toLocaleDateString('id-ID')}</p>
-                                                        </div>
-                                                        <div class="flex gap-2">
-                                                            <button onclick="app.updateStepApproval('${item.project.id}', ${step.step_number}, '${APPROVAL_STATUS.APPROVED}')" 
-                                                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
-                                                                Setujui
-                                                            </button>
-                                                            <button onclick="app.openRejectModal('${item.project.id}', ${step.step_number})" 
-                                                                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
-                                                                Tolak
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                `;
-                                            }).join('')}
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `}
-                    </div>
-                `;
-            },
-
-            renderUsersPage: async (container) => {
-                if (!app.hasPermission('manage_users')) {
-                    container.innerHTML = `
-                        <div class="flex flex-col justify-center items-center h-full text-red-600">
-                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                            <p class="text-lg font-bold">Akses Ditolak</p>
-                            <p class="text-sm mt-2">Hanya admin yang dapat mengakses halaman ini</p>
-                            <button onclick="app.showPage('projects')" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg">
-                                Kembali ke Proyek
-                            </button>
-                        </div>
-                    `;
-                    return;
-                }
-
-                try {
-                    const { data: users, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .order('name');
-
-                    if (error) throw error;
-
-                    container.innerHTML = `
-                        <div class="page-transition">
-                            <div class="flex justify-between items-center mb-6">
-                                <h2 class="text-2xl font-bold">Manajemen User</h2>
-                                <button onclick="app.openUserModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
-                                    + Tambah User
-                                </button>
-                            </div>
-                            
-                            <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
-                                <table class="w-full">
-                                    <thead class="bg-slate-50 border-b">
-                                        <tr>
-                                            <th class="text-left p-4 font-bold text-slate-700">Nama</th>
-                                            <th class="text-left p-4 font-bold text-slate-700">Email</th>
-                                            <th class="text-left p-4 font-bold text-slate-700">Role</th>
-                                            <th class="text-left p-4 font-bold text-slate-700">Regional</th>
-                                            <th class="text-left p-4 font-bold text-slate-700">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                                        ${users.map(user => `
-                                            <tr class="hover:bg-slate-50">
-                                                <td class="p-4">${user.name}</td>
-                                                <td class="p-4">${user.email}</td>
-                                                <td class="p-4">
-                                                    <span class="px-2 py-1 rounded-full text-xs font-bold ${
-                                                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-800'
-                                                    }">
-                                                        ${user.role}
-                                                    </span>
-                                                </td>
-                                                <td class="p-4">${user.regional || '-'}</td>
-                                                <td class="p-4">
-                                                    <button onclick="app.editUser('${user.id}')" class="text-blue-600 hover:text-blue-800 mr-3">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button onclick="app.deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    `;
-                } catch (error) {
-                    console.error('Error loading users:', error);
-                    container.innerHTML = `
-                        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-                            <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-3"></i>
-                            <h3 class="text-lg font-bold text-red-800 mb-2">Error Memuat Data User</h3>
-                            <p class="text-red-600">${error.message}</p>
-                        </div>
-                    `;
-                }
-            },
-
-            openRejectModal: (projectId, stepNumber) => {
-                app.openGeneric(
-                    "Tolak Approval",
-                    `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleRejectApproval(this, '${projectId}', ${stepNumber})">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Alasan Penolakan</label>
-                            <textarea name="notes" placeholder="Berikan alasan penolakan..." class="w-full border p-2 rounded" rows="3" required></textarea>
-                        </div>
-                        <div class="flex gap-2">
-                            <button type="button" onclick="app.toggleModal('modal-generic')" class="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold">
-                                Batal
-                            </button>
-                            <button type="submit" class="flex-1 bg-red-600 text-white py-2 rounded font-bold">
-                                Tolak
-                            </button>
-                        </div>
-                    </form>`
-                );
-            },
-
-            handleRejectApproval: async (form, projectId, stepNumber) => {
-                const formData = new FormData(form);
-                const notes = formData.get('notes');
-                
-                await app.updateStepApproval(projectId, stepNumber, APPROVAL_STATUS.REJECTED, notes);
-                app.toggleModal('modal-generic');
-            },
-
-            openUserModal: () => {
-                app.openGeneric(
-                    "Tambah User Baru",
-                    `<form class="space-y-3" onsubmit="event.preventDefault(); app.handleAddUser(this)">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Nama</label>
-                            <input type="text" name="name" class="w-full border p-2 rounded" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                            <input type="email" name="email" class="w-full border p-2 rounded" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                            <input type="password" name="password" class="w-full border p-2 rounded" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                            <select name="role" class="w-full border p-2 rounded" required>
-                                <option value="user">User</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Regional</label>
-                            <input type="text" name="regional" class="w-full border p-2 rounded">
-                        </div>
-                        <div class="flex gap-2">
-                            <button type="button" onclick="app.toggleModal('modal-generic')" class="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold">
-                                Batal
-                            </button>
-                            <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded font-bold">
-                                Simpan
-                            </button>
-                        </div>
-                    </form>`
-                );
-            },
-
-            handleAddUser: async (form) => {
-                const formData = new FormData(form);
-                const userData = Object.fromEntries(formData);
-                
-                try {
-                    const { error } = await supabase
-                        .from('users')
-                        .insert([userData]);
-                    
-                    if (error) {
-                        app.showToast("Gagal menambah user: " + error.message);
-                    } else {
-                        app.showToast("User berhasil ditambahkan");
-                        app.toggleModal('modal-generic');
-                        app.showPage('users');
-                    }
-                } catch (error) {
-                    console.error('Error adding user:', error);
-                    app.showToast("Terjadi error saat menambah user");
-                }
-            },
-
-            editUser: (userId) => {
-                // Implementation for editing user
-                app.showToast("Fitur edit user belum diimplementasikan");
-            },
-
-            deleteUser: async (userId) => {
-                if (!confirm("Yakin hapus user ini?")) return;
-                
-                try {
-                    const { error } = await supabase
-                        .from('users')
-                        .delete()
-                        .eq('id', userId);
-                    
-                    if (error) {
-                        app.showToast("Gagal menghapus user: " + error.message);
-                    } else {
-                        app.showToast("User berhasil dihapus");
-                        app.showPage('users');
-                    }
-                } catch (error) {
-                    console.error('Error deleting user:', error);
-                    app.showToast("Terjadi error saat menghapus user");
-                }
             },
 
             renderGanttChart: (eventDate) => { 
