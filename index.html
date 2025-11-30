@@ -110,6 +110,9 @@
         // --- MODULE 1: CORE & CONFIG ---
         const Core = {
             supabase: null,
+            SUPABASE_URL: 'https://ruehfvjwdasqpzmroaau.supabase.co', // Exposed for PDFService
+            SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8',
+            
             SOP_STEPS: [
                 { id: 1, name: "Submit Proposal", desc: "H-18", requiresApproval: true },
                 { id: 2, name: "Media & Finance", desc: "H-15", requiresApproval: true },
@@ -120,9 +123,7 @@
             ],
             
             initSupabase: () => {
-                const SUPABASE_URL = 'https://ruehfvjwdasqpzmroaau.supabase.co';
-                const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZWhmdmp3ZGFzcXB6bXJvYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjAwMzgsImV4cCI6MjA3OTk5NjAzOH0.T96V7eHlNpBDV6yIJN1WbFXXb8LUYbA3yWDloY_jya8';
-                Core.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                Core.supabase = window.supabase.createClient(Core.SUPABASE_URL, Core.SUPABASE_KEY);
             },
 
             formatDate: (s) => s ? new Date(s).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'}) : '-',
@@ -277,10 +278,10 @@
                 const getStatus = (sid) => r.approvals.find(a => a.step_number === sid)?.status || 'pending';
                 const stepsHtml = Core.SOP_STEPS.map(s => {
                     const st = getStatus(s.id);
-                    const locked = s.id > 1 && getStatus(s.id-1) !== 'approved';
+                    // UNLOCKED: All steps clickable
                     const active = activeStep === s.id ? 'bg-green-600 text-white' : 'bg-white text-slate-600 border';
                     const icon = st === 'approved' ? 'fa-check text-green-500' : 'fa-circle text-slate-300';
-                    return `<button onclick="${locked?'':`UserModule.openProjectDetail('${p.id}',${s.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl transition mx-1 ${active} ${locked?'opacity-50 cursor-not-allowed':''}">
+                    return `<button onclick="UserModule.openProjectDetail('${p.id}',${s.id})" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl transition mx-1 ${active} hover:shadow-md">
                         <div class="text-xs font-bold">Tahap ${s.id}</div><div class="text-[10px]">${s.name}</div><i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i>
                     </button>`;
                 }).join('');
@@ -391,6 +392,13 @@
             
             uploadFile: async (pid, bucket, file, dbCol) => {
                 if(!file) return;
+                
+                // MODIFIED: Max 500KB check
+                if (file.size > 500 * 1024) {
+                    Core.showToast('File terlalu besar! Maks 500KB.');
+                    return;
+                }
+
                 Core.showToast('Mengupload file... Mohon tunggu');
                 const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
                 const fileName = `${pid}/${Date.now()}_${safeName}`;
@@ -555,16 +563,43 @@
                 doc.autoTable({ startY: y, head: [['Waktu','Kegiatan']], body: r.map(x=>[`${x.time_start}-${x.time_end}`, x.activity]), theme: 'grid', headStyles: {fillColor:[22,163,74]} });
                 y = doc.lastAutoTable.finalY + 10;
 
-                // Images Helper
+                // MODIFIED: Helper function to convert Image URL to JPEG Base64 via Canvas
                 const addImg = async (url, title) => {
                     if(!url) return;
                     if(y > 200) { doc.addPage(); y=20; }
                     line(title, 12, 'bold');
                     try {
                         const blob = await fetch(url.startsWith('http') ? url : `${Core.supabase.storageUrl}/object/public/evidence/${url}`).then(r=>r.blob());
-                        const base64 = await new Promise(r => { const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(blob); });
-                        doc.addImage(base64, 'JPEG', 15, y, 80, 60); y+=65;
-                    } catch(e) { line("(Gambar tidak dapat dimuat)", 10, 'italic'); }
+                        
+                        // Create an image element
+                        const img = new Image();
+                        img.crossOrigin = 'Anonymous'; // FIX: Enable CORS for canvas
+                        const imgLoadPromise = new Promise((resolve, reject) => {
+                            img.onload = resolve;
+                            img.onerror = reject;
+                            img.src = URL.createObjectURL(blob);
+                        });
+                        
+                        await imgLoadPromise;
+
+                        // Draw on canvas with white background
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#FFFFFF'; // White bg to fix transparency issues
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Convert to JPEG Base64
+                        const jpegBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        doc.addImage(jpegBase64, 'JPEG', 15, y, 80, 60); 
+                        y+=65;
+                    } catch(e) { 
+                        console.error(e);
+                        line("(Gambar tidak dapat dimuat)", 10, 'italic'); 
+                    }
                 };
 
                 await addImg(p.firstmeet_proof, "Bukti First Meet:");
