@@ -61,16 +61,8 @@
                 <button onclick="Core.toggleModal('login-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <form id="login-form" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Email</label>
-                    <!-- MODIFIED: Removed default value -->
-                    <input type="email" id="login-email" class="w-full px-4 py-3 border rounded-xl" placeholder="email@example.com">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
-                    <!-- MODIFIED: Removed default value -->
-                    <input type="password" id="login-password" class="w-full px-4 py-3 border rounded-xl" placeholder="********">
-                </div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">Email</label><input type="email" id="login-email" class="w-full px-4 py-3 border rounded-xl" placeholder="email@example.com"></div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">Password</label><input type="password" id="login-password" class="w-full px-4 py-3 border rounded-xl" placeholder="********"></div>
                 <button type="submit" id="btn-submit-login" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">Masuk</button>
                 <div class="text-xs text-slate-500 text-center">Pastikan data sesuai dengan database Supabase.</div>
             </form>
@@ -92,7 +84,6 @@
     <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-20">
         <div class="p-6 flex items-center border-b border-slate-100">
             <div class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-green-200 shadow-lg">
-                <!-- MODIFIED: New Volunteer Icon -->
                 <i class="fas fa-hand-holding-heart"></i>
             </div>
             <h1 class="text-xl font-bold text-slate-800">SANKARA <span class="text-green-600">PM</span></h1>
@@ -104,6 +95,10 @@
         <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
             <button id="nav-dashboard" onclick="App.router('dashboard')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-green-50 text-slate-600 flex items-center"><i class="fas fa-chart-pie w-6"></i> Dashboard</button>
             <button id="nav-projects" onclick="App.router('projects')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-green-50 text-slate-600 flex items-center"><i class="fas fa-layer-group w-6"></i> Proyek</button>
+            
+            <!-- MODIFIED: Added References Menu -->
+            <button id="nav-references" onclick="App.router('references')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-orange-50 text-slate-600 flex items-center"><i class="fas fa-shopping-bag w-6"></i> Referensi Alat</button>
+            
             <div id="admin-menu-section" class="hidden mt-6">
                 <div class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase">Admin</div>
                 <button id="nav-approvals" onclick="App.router('approvals')" class="w-full text-left px-4 py-3 rounded-xl sidebar-item hover:bg-blue-50 text-slate-600 flex items-center"><i class="fas fa-check-circle w-6"></i> Approvals</button>
@@ -179,7 +174,6 @@
                 if (saved) { Auth.currentUser = JSON.parse(saved); Auth.updateUI(true); }
                 document.getElementById('login-form').addEventListener('submit', Auth.handleLogin);
             },
-            // MODIFIED: Login logic now queries Supabase table 'users'
             handleLogin: async (e) => {
                 e.preventDefault();
                 const email = document.getElementById('login-email').value;
@@ -190,18 +184,16 @@
                 btn.innerText = "Memuat...";
 
                 try {
-                    // Query to custom 'users' table
                     const { data, error } = await Core.supabase
                         .from('users')
                         .select('*')
                         .eq('email', email)
-                        .eq('password', password) // Simple match for this demo context
+                        .eq('password', password)
                         .maybeSingle();
 
                     if (error) throw error;
 
                     if (data) {
-                        // Login Success
                         Auth.currentUser = { 
                             id: data.id,
                             name: data.name, 
@@ -243,10 +235,133 @@
             activeProjectId: null,
             filterRegion: 'all',
             dashboardFilterRegion: 'all', 
+            references: [], // MODIFIED: Add references state
 
             loadData: async () => {
                 const { data } = await Core.supabase.from('projects').select('*').order('event_date');
                 UserModule.projects = data || [];
+            },
+
+            // MODIFIED: Load references data
+            loadReferences: async () => {
+                const { data } = await Core.supabase.from('event_tools_references').select('*').order('product_name');
+                UserModule.references = data || [];
+            },
+
+            // MODIFIED: Render References Page
+            renderReferences: async (container) => {
+                await UserModule.loadReferences();
+                
+                container.innerHTML = `
+                    <div class="fade-in">
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                            <div>
+                                <h2 class="text-2xl font-bold">Referensi Alat & Bahan</h2>
+                                <p class="text-sm text-slate-500">Daftar rekomendasi barang untuk kebutuhan acara</p>
+                            </div>
+                            <button onclick="UserModule.addReferenceModal()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md shadow-orange-200 transition flex items-center">
+                                <i class="fas fa-plus mr-2"></i> Tambah Referensi
+                            </button>
+                        </div>
+                        
+                        ${UserModule.references.length === 0 ? `
+                            <div class="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+                                <i class="fas fa-shopping-bag text-4xl mb-3 text-slate-300"></i>
+                                <p>Belum ada data referensi alat.</p>
+                            </div>
+                        ` : `
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                ${UserModule.references.map(item => {
+                                    const rJson = JSON.stringify(item).replace(/"/g, '&quot;');
+                                    return `
+                                    <div class="bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition relative group">
+                                        <div class="flex justify-between items-start">
+                                            <div class="flex-1 pr-2">
+                                                <h3 class="font-bold text-slate-800 mb-1">${item.product_name}</h3>
+                                                <a href="${item.purchase_link}" target="_blank" class="text-xs text-blue-500 hover:underline truncate block mb-3 flex items-center">
+                                                    <i class="fas fa-external-link-alt mr-1"></i> Link Pembelian
+                                                </a>
+                                            </div>
+                                            <div class="flex gap-1">
+                                                <button onclick="UserModule.editReferenceModal(${rJson})" class="text-slate-400 hover:text-blue-500 p-1 rounded transition"><i class="fas fa-edit"></i></button>
+                                                <button onclick="UserModule.deleteReference('${item.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded transition"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `}
+                    </div>
+                `;
+            },
+
+            // MODIFIED: Add Reference Modal
+            addReferenceModal: () => {
+                const html = `
+                    <form onsubmit="event.preventDefault(); UserModule.saveReference(this)">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">NAMA PRODUK / ALAT</label>
+                        <input name="product_name" class="w-full border p-2 rounded mb-3" placeholder="Contoh: Tali Rafia Besar" required>
+                        
+                        <label class="block text-xs font-bold text-slate-500 mb-1">LINK PEMBELIAN (E-COMMERCE)</label>
+                        <input name="purchase_link" class="w-full border p-2 rounded mb-4" placeholder="https://shopee.co.id/..." required>
+                        
+                        <button class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded font-bold transition">Simpan Referensi</button>
+                    </form>
+                `;
+                Core.openGenericModal('Tambah Referensi Alat', html);
+            },
+
+            // MODIFIED: Edit Reference Modal
+            editReferenceModal: (item) => {
+                const html = `
+                    <form onsubmit="event.preventDefault(); UserModule.saveReference(this)">
+                        <input type="hidden" name="id" value="${item.id}">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">NAMA PRODUK / ALAT</label>
+                        <input name="product_name" value="${item.product_name}" class="w-full border p-2 rounded mb-3" required>
+                        
+                        <label class="block text-xs font-bold text-slate-500 mb-1">LINK PEMBELIAN (E-COMMERCE)</label>
+                        <input name="purchase_link" value="${item.purchase_link}" class="w-full border p-2 rounded mb-4" required>
+                        
+                        <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-bold transition">Update Referensi</button>
+                    </form>
+                `;
+                Core.openGenericModal('Edit Referensi Alat', html);
+            },
+
+            // MODIFIED: Save Reference
+            saveReference: async (form) => {
+                const d = Object.fromEntries(new FormData(form));
+                let error;
+                
+                if (d.id) {
+                    const { error: err } = await Core.supabase.from('event_tools_references').update(d).eq('id', d.id);
+                    error = err;
+                } else {
+                    delete d.id;
+                    const { error: err } = await Core.supabase.from('event_tools_references').insert(d);
+                    error = err;
+                }
+
+                if (error) {
+                    Core.showToast('Gagal simpan: ' + error.message);
+                } else {
+                    Core.showToast('Referensi berhasil disimpan');
+                    Core.toggleModal('modal-generic');
+                    UserModule.renderReferences(document.getElementById('content-area'));
+                }
+            },
+
+            // MODIFIED: Delete Reference
+            deleteReference: async (id) => {
+                if(!confirm('Hapus referensi ini?')) return;
+                const { error } = await Core.supabase.from('event_tools_references').delete().eq('id', id);
+                if (error) {
+                    Core.showToast('Gagal hapus: ' + error.message);
+                } else {
+                    Core.showToast('Referensi dihapus');
+                    UserModule.renderReferences(document.getElementById('content-area'));
+                }
             },
 
             renderDashboard: async (container) => {
@@ -962,6 +1077,7 @@
                 if(r==='dashboard'){ UserModule.loadData().then(()=>UserModule.renderDashboard(c)); }
                 if(r==='projects'){ UserModule.loadData().then(()=>UserModule.renderProjectList(c)); }
                 if(r==='approvals'){ AdminModule.renderApprovals(c); }
+                if(r==='references'){ UserModule.renderReferences(c); }
             }
         };
         document.addEventListener('DOMContentLoaded', App.init);
