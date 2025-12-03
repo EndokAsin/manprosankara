@@ -61,10 +61,9 @@
                 <button onclick="Core.toggleModal('login-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
             </div>
             <form id="login-form" class="p-6 space-y-4">
-                <div><label class="block text-sm font-medium text-slate-700 mb-2">Email</label><input type="email" id="login-email" class="w-full px-4 py-3 border rounded-xl" placeholder="email@example.com"></div>
-                <div><label class="block text-sm font-medium text-slate-700 mb-2">Password</label><input type="password" id="login-password" class="w-full px-4 py-3 border rounded-xl" placeholder="********"></div>
-                <button type="submit" id="btn-submit-login" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">Masuk</button>
-                <div class="text-xs text-slate-500 text-center">Pastikan data sesuai dengan database Supabase.</div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">Email</label><input type="email" id="login-email" class="w-full px-4 py-3 border rounded-xl" placeholder="admin@sankara.org"></div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">Password</label><input type="password" id="login-password" class="w-full px-4 py-3 border rounded-xl" placeholder="admin123"></div>
+                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">Masuk</button>
             </form>
         </div>
     </div>
@@ -235,20 +234,18 @@
             activeProjectId: null,
             filterRegion: 'all',
             dashboardFilterRegion: 'all', 
-            references: [], // MODIFIED: Add references state
+            references: [], 
 
             loadData: async () => {
                 const { data } = await Core.supabase.from('projects').select('*').order('event_date');
                 UserModule.projects = data || [];
             },
 
-            // MODIFIED: Load references data
             loadReferences: async () => {
                 const { data } = await Core.supabase.from('event_tools_references').select('*').order('product_name');
                 UserModule.references = data || [];
             },
 
-            // MODIFIED: Render References Page
             renderReferences: async (container) => {
                 await UserModule.loadReferences();
                 
@@ -296,7 +293,6 @@
                 `;
             },
 
-            // MODIFIED: Add Reference Modal
             addReferenceModal: () => {
                 const html = `
                     <form onsubmit="event.preventDefault(); UserModule.saveReference(this)">
@@ -312,7 +308,6 @@
                 Core.openGenericModal('Tambah Referensi Alat', html);
             },
 
-            // MODIFIED: Edit Reference Modal
             editReferenceModal: (item) => {
                 const html = `
                     <form onsubmit="event.preventDefault(); UserModule.saveReference(this)">
@@ -329,7 +324,6 @@
                 Core.openGenericModal('Edit Referensi Alat', html);
             },
 
-            // MODIFIED: Save Reference
             saveReference: async (form) => {
                 const d = Object.fromEntries(new FormData(form));
                 let error;
@@ -352,7 +346,6 @@
                 }
             },
 
-            // MODIFIED: Delete Reference
             deleteReference: async (id) => {
                 if(!confirm('Hapus referensi ini?')) return;
                 const { error } = await Core.supabase.from('event_tools_references').delete().eq('id', id);
@@ -662,6 +655,7 @@
                         <div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded">+ Divisi</button></div>
                         <div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div>
                         <label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>
+                        ${status === 'approved' ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Progress Tahap 3)</button>` : ''}
                     `;
                 } else if (sid === 4) {
                     body += `
@@ -986,10 +980,11 @@
                     let y = 20; const line = (txt, sz=10, type='normal') => { doc.setFontSize(sz); doc.setFont(undefined, type); doc.text(txt, 15, y); y+=sz/2+2; };
 
                     // Header
-                    doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Sankara NGO", 105, y, null, null, 'center'); y+=10;
+                    doc.setTextColor(22, 163, 74); doc.setFontSize(18); doc.text("Laporan Proyek Regional Sankara", 105, y, null, null, 'center'); y+=10;
                     doc.setTextColor(0); doc.setFontSize(10);
                     line(`Nama Kegiatan: ${p.title}`); line(`Tanggal: ${Core.formatDate(p.event_date)} | Lokasi: ${p.location}`); 
                     line(`Regional: ${p.regional} | Leader: ${p.leader}`); 
+                    // MODIFIED: Added Target Audience
                     line(`Target Audience: ${p.target_audience || '-'}`);
                     y+=5;
                     doc.setDrawColor(200); doc.line(15,y,195,y); y+=8;
