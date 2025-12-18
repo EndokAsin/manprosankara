@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- jsPDF & AutoTable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -114,6 +116,7 @@
 
     <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div class="h-1.5 w-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 absolute top-0 left-0 z-30"></div>
+        
         <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
             <div class="font-bold text-green-700 text-lg md:hidden flex items-center">
                 <i class="fas fa-hand-holding-heart mr-2"></i>SANKARA PM
@@ -156,6 +159,21 @@
                 if(onSubmitFn) document.querySelector('#modal-generic-content form').onsubmit = onSubmitFn;
                 Core.toggleModal('modal-generic');
             },
+            
+            confirm: (msg) => {
+                return new Promise((resolve) => {
+                    document.getElementById('modal-confirm-msg').textContent = msg;
+                    document.getElementById('modal-confirm').classList.remove('hidden');
+                    const yesBtn = document.getElementById('btn-confirm-yes');
+                    const noBtn = document.getElementById('btn-confirm-cancel');
+                    const newYes = yesBtn.cloneNode(true);
+                    const newNo = noBtn.cloneNode(true);
+                    yesBtn.parentNode.replaceChild(newYes, yesBtn);
+                    noBtn.parentNode.replaceChild(newNo, noBtn);
+                    newYes.onclick = () => { document.getElementById('modal-confirm').classList.add('hidden'); resolve(true); };
+                    newNo.onclick = () => { document.getElementById('modal-confirm').classList.add('hidden'); resolve(false); };
+                });
+            },
 
             fetchRegions: async () => {
                 const { data, error } = await Core.supabase.from('pm_regions').select('*').order('name');
@@ -191,6 +209,7 @@
             UserModule.references = data || [];
         };
 
+        // --- HELPER: Calculate Logic ---
         UserModule.calculateEffectiveStep = (p) => {
             const approvals = p.project_approvals || [];
             const step2 = approvals.find(a => a.step_number === 2);
@@ -199,13 +218,19 @@
             let dbStep = parseInt(p.step) || 1;
             let effectiveStep = 1;
 
-            if (step6 && step6.status === 'approved') return 6;
-            if (step2 && step2.status === 'approved') {
-                return Math.max(3, Math.min(5, dbStep));
-            } else if (step2 && step2.status === 'submitted') {
-                return 2; 
+            if (step6 && step6.status === 'approved') {
+                effectiveStep = 6;
+            } else {
+                if (step2 && step2.status === 'approved') {
+                    effectiveStep = Math.max(3, dbStep);
+                    effectiveStep = Math.min(5, effectiveStep);
+                } else if (step2 && step2.status === 'submitted') {
+                    effectiveStep = 2; // Menunggu Finance
+                } else {
+                    effectiveStep = Math.min(2, dbStep);
+                }
             }
-            return Math.min(2, dbStep);
+            return effectiveStep;
         };
 
         UserModule.renderReferences = async (container) => {
@@ -230,10 +255,46 @@
             Core.showToast('Disimpan'); Core.toggleModal('modal-generic'); UserModule.renderReferences(document.getElementById('content-area'));
         };
 
-        UserModule.renderGanttChart = (list) => {
-            if(!list.length) return '';
-            const h = Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 text-center text-xs border-r">${i-10}</div>`).join('');
-            return `<div class="min-w-[600px]"><div class="flex border-b pb-1"><div class="w-40 shrink-0">Project</div><div class="flex">${h}</div></div>${list.map(p=>`<div class="flex border-b py-1 hover:bg-slate-50"><div class="w-40 shrink-0 truncate pr-2 text-sm">${p.title}</div><div class="flex">${Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 border-r h-4 ${i===10?'bg-green-500':''}"></div>`).join('')}</div></div>`).join('')}</div>`;
+        UserModule.renderDashboard = async (container) => {
+            const regions = await Core.fetchRegions();
+            const filtered = UserModule.dashboardFilterRegion === 'all' 
+                ? UserModule.projects 
+                : UserModule.projects.filter(p => p.regional === UserModule.dashboardFilterRegion);
+
+            const total = filtered.length;
+            let stage1 = 0, stage2 = 0, active = 0, completed = 0;
+
+            filtered.forEach(p => {
+                const step = UserModule.calculateEffectiveStep(p);
+                if(step === 1) stage1++;
+                else if(step === 2) stage2++;
+                else if(step >= 3 && step <= 5) active++;
+                else if(step === 6) completed++;
+            });
+
+            container.innerHTML = `
+                <div class="fade-in space-y-6">
+                    <div class="flex flex-col md:flex-row justify-between items-center">
+                        <h2 class="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
+                        <select onchange="UserModule.dashboardFilterRegion=this.value; UserModule.renderDashboard(document.getElementById('content-area'))" class="border border-slate-300 rounded-lg px-4 py-2 text-sm bg-white shadow-sm focus:ring-2 focus:ring-green-500 outline-none cursor-pointer">
+                            <option value="all">Semua Regional</option>
+                            ${regions.map(r => `<option value="${r.name}" ${UserModule.dashboardFilterRegion===r.name?'selected':''}>${r.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div class="text-xs text-slate-500 uppercase font-bold mb-1">Total Proyek</div><div class="text-3xl font-bold text-slate-800">${total}</div></div>
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm"><div class="text-xs text-blue-600 uppercase font-bold mb-1">Proposal (Thp 1)</div><div class="text-3xl font-bold text-blue-800">${stage1}</div></div>
+                        <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 shadow-sm"><div class="text-xs text-yellow-600 uppercase font-bold mb-1">Finance (Thp 2)</div><div class="text-3xl font-bold text-yellow-800">${stage2}</div></div>
+                        <div class="bg-purple-50 p-4 rounded-xl border border-purple-100 shadow-sm"><div class="text-xs text-purple-600 uppercase font-bold mb-1">Berjalan (Thp 3-5)</div><div class="text-3xl font-bold text-purple-800">${active}</div></div>
+                        <div class="bg-green-50 p-4 rounded-xl border border-green-100 shadow-sm"><div class="text-xs text-green-600 uppercase font-bold mb-1">Selesai (Thp 6)</div><div class="text-3xl font-bold text-green-800">${completed}</div></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm"><h3 class="font-bold text-slate-700 mb-4 text-sm">Distribusi Status Proyek</h3><div class="h-64"><canvas id="statusChart"></canvas></div></div>
+                        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm"><h3 class="font-bold text-slate-700 mb-4 text-sm">Jumlah Proyek per Regional</h3><div class="h-64"><canvas id="regionChart"></canvas></div></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm overflow-hidden"><h3 class="font-bold text-slate-700 mb-4 text-sm">Timeline Proyek Aktif</h3><div class="overflow-x-auto pb-2">${UserModule.renderGanttChart(filtered)}</div></div>
+                </div>`;
+            UserModule.initDashboardCharts(stage1, stage2, active, completed, filtered);
         };
 
         UserModule.initDashboardCharts = (s1, s2, active, completed, data) => {
@@ -258,42 +319,6 @@
             }
         };
 
-        UserModule.renderDashboard = async (container) => {
-            const regions = await Core.fetchRegions();
-            const filtered = UserModule.dashboardFilterRegion === 'all' 
-                ? UserModule.projects 
-                : UserModule.projects.filter(p => p.regional === UserModule.dashboardFilterRegion);
-
-            const total = filtered.length;
-            let stage1 = 0, stage2 = 0, active = 0, completed = 0;
-
-            filtered.forEach(p => {
-                const step = UserModule.calculateEffectiveStep(p);
-                if(step === 1) stage1++; else if(step === 2) stage2++; else if(step >= 3 && step <= 5) active++; else if(step === 6) completed++;
-            });
-
-            container.innerHTML = `
-                <div class="fade-in space-y-6">
-                    <div class="flex flex-col md:flex-row justify-between items-center">
-                        <h2 class="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
-                        <select onchange="UserModule.dashboardFilterRegion=this.value; UserModule.renderDashboard(document.getElementById('content-area'))" class="border border-slate-300 rounded-lg px-4 py-2 text-sm bg-white shadow-sm focus:ring-2 focus:ring-green-500 outline-none cursor-pointer"><option value="all">Semua Regional</option>${regions.map(r => `<option value="${r.name}" ${UserModule.dashboardFilterRegion===r.name?'selected':''}>${r.name}</option>`).join('')}</select>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div class="text-xs text-slate-500 uppercase font-bold mb-1">Total Proyek</div><div class="text-3xl font-bold text-slate-800">${total}</div></div>
-                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm"><div class="text-xs text-blue-600 uppercase font-bold mb-1">Proposal (Thp 1)</div><div class="text-3xl font-bold text-blue-800">${stage1}</div></div>
-                        <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 shadow-sm"><div class="text-xs text-yellow-600 uppercase font-bold mb-1">Finance (Thp 2)</div><div class="text-3xl font-bold text-yellow-800">${stage2}</div></div>
-                        <div class="bg-purple-50 p-4 rounded-xl border border-purple-100 shadow-sm"><div class="text-xs text-purple-600 uppercase font-bold mb-1">Berjalan (Thp 3-5)</div><div class="text-3xl font-bold text-purple-800">${active}</div></div>
-                        <div class="bg-green-50 p-4 rounded-xl border border-green-100 shadow-sm"><div class="text-xs text-green-600 uppercase font-bold mb-1">Selesai (Thp 6)</div><div class="text-3xl font-bold text-green-800">${completed}</div></div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm"><h3 class="font-bold text-slate-700 mb-4 text-sm">Distribusi Status Proyek</h3><div class="h-64"><canvas id="statusChart"></canvas></div></div>
-                        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm"><h3 class="font-bold text-slate-700 mb-4 text-sm">Jumlah Proyek per Regional</h3><div class="h-64"><canvas id="regionChart"></canvas></div></div>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm overflow-hidden"><h3 class="font-bold text-slate-700 mb-4 text-sm">Timeline Proyek Aktif</h3><div class="overflow-x-auto pb-2">${UserModule.renderGanttChart(filtered)}</div></div>
-                </div>`;
-            UserModule.initDashboardCharts(stage1, stage2, active, completed, filtered);
-        };
-
         UserModule.renderProjectList = async (container) => {
             const regions = await Core.fetchRegions();
             const filtered = UserModule.filterRegion === 'all' ? UserModule.projects : UserModule.projects.filter(p => p.regional === UserModule.filterRegion);
@@ -316,7 +341,9 @@
                             const stepNum = UserModule.calculateEffectiveStep(p);
                             const progress = (stepNum / 6) * 100;
                             let statusColor = 'bg-slate-100 text-slate-600 border-slate-200';
-                            if (stepNum >= 6) statusColor = 'bg-green-50 text-green-700 border-green-200'; else if (stepNum >= 3) statusColor = 'bg-blue-50 text-blue-700 border-blue-200'; else if (stepNum === 2) statusColor = 'bg-yellow-50 text-yellow-700 border-yellow-200';
+                            if (stepNum >= 6) statusColor = 'bg-green-50 text-green-700 border-green-200';
+                            else if (stepNum >= 3) statusColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                            else if (stepNum === 2) statusColor = 'bg-yellow-50 text-yellow-700 border-yellow-200';
                             const stepName = Core.SOP_STEPS.find(s => s.id === stepNum)?.name || '';
                             const dynamicStatus = `Tahap ${stepNum}: ${stepName}`;
 
@@ -388,6 +415,12 @@
             const status = getStatus(sid);
             const step = Core.SOP_STEPS.find(s => s.id === sid);
             
+            // LOGIC LOCKING REVISED:
+            // Check if step 2 is approved.
+            const isFinanceApproved = getStatus(2) === 'approved';
+            // Is this step locked? (Lock steps 3,4,5,6 if Finance not approved)
+            const isStepLocked = (sid > 2 && !isFinanceApproved);
+
             let controls = '';
             if(step.requiresApproval) {
                 if(status === 'pending') controls = `<button onclick="UserModule.submitApproval('${p.id}', ${sid})" class="bg-blue-600 text-white w-full py-2 rounded font-bold">Ajukan ke Finance</button>`;
@@ -403,14 +436,20 @@
                 const st = getStatus(s.id);
                 const icon = st === 'approved' ? 'fa-check text-green-500' : 'fa-circle text-slate-300';
                 let locked = false;
-                if (s.id > currentEffectiveStep + 1) locked = true;
-                if (s.id > 2 && getStatus(2) !== 'approved') locked = true;
+                // Allow user to navigate freely up to current step + 1, OR if Finance Approved (unlocks all non-approval steps for viewing)
+                // If Finance approved (Step 2), unlock step 3,4,5. Step 6 needs its own flow.
+                if (s.id > 2 && !isFinanceApproved) locked = true;
+                
                 return `<button onclick="${locked?'':`UserModule.openProjectDetail('${p.id}',${s.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl mx-1 ${sid===s.id?'bg-green-600 text-white':'bg-white text-slate-600 border'} ${locked?'opacity-50 cursor-not-allowed': 'hover:shadow-md'}"><div class="text-xs font-bold">Tahap ${s.id}</div><div class="text-[10px]">${s.name}</div><i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i></button>`;
             }).join('');
 
             let body = `<div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded mb-6"><p class="font-bold text-sm">Deadline: ${step.desc}</p></div>`;
             const pJson = JSON.stringify({id: p.id, title: p.title, event_date: p.event_date, location: p.location, regional: p.regional, leader: p.leader}).replace(/"/g, '&quot;');
             const infoCard = `<div class="bg-white border p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row justify-between items-start md:items-center"><div><div class="flex items-center gap-2 mb-1"><span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">${p.regional}</span><h1 class="text-xl font-bold text-slate-800">${p.title}</h1><button onclick="UserModule.openEditProjectModal(${pJson})" class="text-slate-400 hover:text-blue-600"><i class="fas fa-pencil-alt"></i></button></div><div class="flex gap-4 text-sm text-slate-500 mt-2"><div class="flex items-center gap-1"><i class="fas fa-user-circle text-gray-400"></i> ${p.leader || '-'}</div><div class="flex items-center gap-1"><i class="fas fa-map-marker-alt text-gray-400"></i> ${p.location || '-'}</div><div class="flex items-center gap-1"><i class="fas fa-calendar-alt text-gray-400"></i> ${Core.formatDate(p.event_date)}</div></div></div></div>`;
+
+            // RENDER BODY CONTENT BASED ON STEP
+            // Apply isLocked check for edit buttons
+            const isLocked = isFinanceApproved; // Lock editing if finance approved
 
             if (sid === 2) {
                 let defDelegates = p.estimated_delegates || UserModule.rabInputs.delegates || 0;
@@ -435,7 +474,10 @@
                 };
 
                 const getStatusColor = (act, lim) => act > lim ? 'text-red-600 font-bold' : 'text-green-600';
-                const calcHtml = `<div class="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6"><h4 class="font-bold text-gray-700 mb-4 border-b pb-2"><i class="fas fa-calculator mr-2"></i>Perencanaan Anggaran</h4><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="block text-xs font-bold text-gray-500 mb-1">Jumlah Delegasi</label><input id="calc-delegates" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defDelegates}"></div><div><label class="block text-xs font-bold text-slate-500 mb-1">Harga Volunteer (Rp)</label><input id="calc-price" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defPrice}"></div></div><button onclick="UserModule.updateCalculator()" class="w-full bg-blue-600 text-white py-2 rounded mb-4 font-bold hover:bg-blue-700 transition shadow-sm"><i class="fas fa-save mr-2"></i>Simpan & Hitung</button><div class="flex justify-between items-center bg-blue-100 p-3 rounded mb-4"><span class="text-sm font-bold text-blue-800">Total Pemasukan (Estimasi):</span><span id="calc-income" class="text-lg font-bold text-blue-900">${Core.formatCurrency(totalIncome)}</span></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs"><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen A (Alat & Bahan) - 40%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-A">${Core.formatCurrency(limits['Komponen A'])}</span></span><span class="${getStatusColor(actuals['Komponen A'], limits['Komponen A'])}">Pakai: ${Core.formatCurrency(actuals['Komponen A'])}</span></div></div><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen B (Konsumsi) - 20%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-B">${Core.formatCurrency(limits['Komponen B'])}</span></span><span class="${getStatusColor(actuals['Komponen B'], limits['Komponen B'])}">Pakai: ${Core.formatCurrency(actuals['Komponen B'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen C (Fixed) - Auto</div><div class="flex justify-between items-center"><span class="text-gray-500">Tetap: 500rb</span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen C'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen D (Lain-lain) - Auto 10%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-D">${Core.formatCurrency(limits['Komponen D'])}</span></span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen D'])}</span></div></div></div></div>`;
+                // Hide Save button if Locked
+                const calcButton = isLocked ? '<div class="text-xs text-green-600 font-bold mb-4"><i class="fas fa-lock"></i> Anggaran Telah Disetujui (Terkunci)</div>' : '<button onclick="UserModule.updateCalculator()" class="w-full bg-blue-600 text-white py-2 rounded mb-4 font-bold hover:bg-blue-700 transition shadow-sm"><i class="fas fa-save mr-2"></i>Simpan & Hitung</button>';
+                
+                const calcHtml = `<div class="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6"><h4 class="font-bold text-gray-700 mb-4 border-b pb-2"><i class="fas fa-calculator mr-2"></i>Perencanaan Anggaran</h4><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="block text-xs font-bold text-gray-500 mb-1">Jumlah Delegasi</label><input id="calc-delegates" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defDelegates}" ${isLocked?'disabled':''}></div><div><label class="block text-xs font-bold text-slate-500 mb-1">Harga Volunteer (Rp)</label><input id="calc-price" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defPrice}" ${isLocked?'disabled':''}></div></div>${calcButton}<div class="flex justify-between items-center bg-blue-100 p-3 rounded mb-4"><span class="text-sm font-bold text-blue-800">Total Pemasukan (Estimasi):</span><span id="calc-income" class="text-lg font-bold text-blue-900">${Core.formatCurrency(totalIncome)}</span></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs"><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen A (Alat & Bahan) - 40%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-A">${Core.formatCurrency(limits['Komponen A'])}</span></span><span class="${getStatusColor(actuals['Komponen A'], limits['Komponen A'])}">Pakai: ${Core.formatCurrency(actuals['Komponen A'])}</span></div></div><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen B (Konsumsi) - 20%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-B">${Core.formatCurrency(limits['Komponen B'])}</span></span><span class="${getStatusColor(actuals['Komponen B'], limits['Komponen B'])}">Pakai: ${Core.formatCurrency(actuals['Komponen B'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen C (Fixed) - Auto</div><div class="flex justify-between items-center"><span class="text-gray-500">Tetap: 500rb</span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen C'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen D (Lain-lain) - Auto 10%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-D">${Core.formatCurrency(limits['Komponen D'])}</span></span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen D'])}</span></div></div></div></div>`;
 
                 const renderCategoryRows = (catName, title, isAuto = false) => {
                     const items = (r.budgets||[]).filter(b => { if(catName === 'Komponen A') return b.item_name.startsWith(`[${catName}]`) || !b.item_name.startsWith('['); return b.item_name.startsWith(`[${catName}]`); });
@@ -444,8 +486,11 @@
                         const bJson = JSON.stringify(b).replace(/"/g, '&quot;');
                         const cleanName = b.item_name.replace(/^\[.*?\]\s/, '');
                         const hasInvoice = b.invoice_url ? true : false;
-                        const actionButtons = isAuto ? `<span class="text-[9px] text-gray-400 italic">Otomatis dari sistem</span>` : `<div class="flex items-center gap-1 justify-end">${hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-[10px] text-green-600 hover:text-green-800 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1" title="Lihat Invoice"><i class="fas fa-eye"></i></a>` : ''}<label class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1" title="${hasInvoice ? 'Ganti Invoice' : 'Upload Invoice'}"><i class="fas fa-upload"></i> ${hasInvoice ? 'Ganti' : 'Upload'}<input type="file" class="hidden" onchange="UserModule.uploadBudgetProof('${p.id}', '${b.id}', this.files[0])"></label><button onclick="UserModule.editBudget('${p.id}', ${bJson})" class="text-[10px] text-slate-500 hover:text-blue-500 p-1"><i class="fas fa-pen"></i></button><button onclick="UserModule.deleteItem('budgets', '${b.id}', '${p.id}')" class="text-[10px] text-slate-500 hover:text-red-500 p-1"><i class="fas fa-trash"></i></button></div>`;
-                        return `<div class="flex justify-between items-center border-b pb-2 pt-2 hover:bg-slate-50 text-xs pl-2 pr-2"><div class="flex-1"><div class="font-medium text-slate-800">${cleanName}</div><div class="text-[10px] text-slate-500 mt-1">${b.quantity} x ${Core.formatCurrency(b.unit_price)} ${hasInvoice ? '<span class="ml-1 text-green-600 flex items-center gap-1 inline-flex"><i class="fas fa-check-circle"></i> Ada Bukti</span>' : '<span class="ml-1 text-gray-400 italic">(Belum ada bukti)</span>'}</div></div><div class="text-right"><div class="font-bold text-slate-700 mb-1">${Core.formatCurrency(b.total_price)}</div><div class="flex justify-end">${actionButtons}</div></div></div>`;
+                        // Hide edit/delete if locked or auto
+                        const actionButtons = (isAuto || isLocked) ? 
+                            (hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-green-600"><i class="fas fa-file-invoice"></i></a>` : '') : 
+                            `<div class="flex items-center gap-1 justify-end">${hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-[10px] text-green-600 hover:text-green-800 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1" title="Lihat Invoice"><i class="fas fa-eye"></i></a>` : ''}<label class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1" title="${hasInvoice ? 'Ganti Invoice' : 'Upload Invoice'}"><i class="fas fa-upload"></i> ${hasInvoice ? 'Ganti' : 'Upload'}<input type="file" class="hidden" onchange="UserModule.uploadBudgetProof('${p.id}', '${b.id}', this.files[0])"></label><button onclick="UserModule.editBudget('${p.id}', ${bJson})" class="text-[10px] text-slate-500 hover:text-blue-500 p-1"><i class="fas fa-pen"></i></button><button onclick="UserModule.deleteItem('budgets', '${b.id}', '${p.id}')" class="text-[10px] text-slate-500 hover:text-red-500 p-1"><i class="fas fa-trash"></i></button></div>`;
+                        return `<div class="flex justify-between items-center border-b pb-2 pt-2 hover:bg-slate-50 text-xs pl-2 pr-2"><div class="flex-1"><div class="font-medium text-slate-800">${cleanName}</div><div class="text-[10px] text-slate-500 mt-1">${b.quantity} x ${Core.formatCurrency(b.unit_price)} ${hasInvoice ? '<span class="ml-1 text-green-600 flex items-center gap-1 inline-flex"><i class="fas fa-check-circle"></i> Ada Bukti</span>' : ''}</div></div><div class="text-right"><div class="font-bold text-slate-700 mb-1">${Core.formatCurrency(b.total_price)}</div><div class="flex justify-end">${actionButtons}</div></div></div>`;
                     }).join('');
                     const subtotal = items.reduce((sum, b) => sum + (b.total_price||0), 0);
                     return `<div class="mb-3 bg-white border rounded p-2 shadow-sm"><h5 class="text-xs font-bold text-gray-700 border-b pb-2 mb-2 flex justify-between bg-gray-50 p-2 rounded -mx-2 -mt-2"><span>${title}</span><span class="text-blue-600">${Core.formatCurrency(subtotal)}</span></h5>${rows}</div>`;
@@ -453,7 +498,9 @@
 
                 const rabContent = `${renderCategoryRows('Komponen A', 'Alat & Bahan (Komponen A)')}${renderCategoryRows('Komponen B', 'Konsumsi (Komponen B)')}${renderCategoryRows('Komponen C', 'Fixed Cost (Komponen C - Otomatis)', true)}${renderCategoryRows('Komponen D', 'Lain-lain (Komponen D - Otomatis)', true)}`;
 
-                body += `${calcHtml}<div class="flex justify-between items-center mb-3 mt-6 pb-2 border-b border-gray-200"><h4 class="font-bold text-lg text-slate-800">Daftar Item Belanja</h4><div class="flex gap-2"><button onclick="UserModule.addItemModal('budgets','${p.id}', 'Komponen A')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">+ Alat & Bahan</button><button onclick="UserModule.addItemModal('budgets','${p.id}', 'Komponen B')" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">+ Konsumsi</button></div></div><div class="space-y-1 mb-6">${rabContent || '<div class="text-center py-4 text-slate-400 italic bg-slate-50 rounded">Belum ada item belanja.</div>'}<div class="flex justify-between font-bold pt-3 border-t-2 border-slate-200 mt-2 text-lg text-blue-800"><span>Total Pengajuan</span><span>${Core.formatCurrency(grandTotal)}</span></div></div><div class="mt-8 border-t pt-4"><div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Ringkasan Kegiatan</h4><button onclick="UserModule.addItemModal('rundowns','${p.id}')" class="text-xs text-blue-600 hover:underline">+ Tambah Kegiatan</button></div>
+                const addButtons = isLocked ? '' : `<div class="flex gap-2"><button onclick="UserModule.addItemModal('budgets','${p.id}', 'Komponen A')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">+ Alat & Bahan</button><button onclick="UserModule.addItemModal('budgets','${p.id}', 'Komponen B')" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">+ Konsumsi</button></div>`;
+
+                body += `${calcHtml}<div class="flex justify-between items-center mb-3 mt-6 pb-2 border-b border-gray-200"><h4 class="font-bold text-lg text-slate-800">Daftar Item Belanja</h4>${addButtons}</div><div class="space-y-1 mb-6">${rabContent || '<div class="text-center py-4 text-slate-400 italic bg-slate-50 rounded">Belum ada item belanja.</div>'}<div class="flex justify-between font-bold pt-3 border-t-2 border-slate-200 mt-2 text-lg text-blue-800"><span>Total Pengajuan</span><span>${Core.formatCurrency(grandTotal)}</span></div></div><div class="mt-8 border-t pt-4"><div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-700">Ringkasan Kegiatan</h4><button onclick="UserModule.openRundownModal('${p.id}')" class="text-xs text-blue-600 hover:underline">+ Edit Rundown</button></div>
                 <div class="bg-slate-50 p-3 rounded text-xs text-slate-600 space-y-1">
                     ${(r.rundowns||[]).map(rd => {
                         const rdJson = JSON.stringify(rd).replace(/"/g, '&quot;');
@@ -469,7 +516,7 @@
             } else if (sid === 3) {
                     const volRows = (r.volunteers||[]).map(v => { const vJson = JSON.stringify(v).replace(/"/g, '&quot;'); return `<div class="bg-slate-50 p-2 rounded border text-sm flex justify-between items-center"><span>${v.role_name}</span><div class="flex gap-2 font-bold items-center"><span>${v.count}</span><div class="flex gap-1 border-l pl-2 ml-2 border-slate-300"><button onclick="UserModule.editVolunteer('${p.id}', ${vJson})" class="text-blue-500 font-normal hover:text-blue-700"><i class="fas fa-edit"></i></button><button onclick="UserModule.deleteItem('volunteers', '${v.id}', '${p.id}')" class="text-red-400 font-normal hover:text-red-600"><i class="fas fa-trash"></i></button></div></div></div>`; }).join('');
                     const isFinanceApproved = getStatus(2) === 'approved';
-                    body += `<div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 transition">+ Divisi</button></div><div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div><label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>${isFinanceApproved ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Rundown & RAB)</button>` : '<div class="text-xs text-orange-500 italic mt-2 text-center bg-orange-50 p-2 rounded">Tombol download PDF akan muncul setelah Finance disetujui.</div>'}`;
+                    body += `<div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 transition">+ Divisi</button></div><div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div><label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>${isFinanceApproved ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Rundown & RAB)</button>` : ''}`;
             } else if (sid === 4) {
                 body += `<label class="text-xs font-bold text-slate-500">CATATAN FIRST MEET</label><textarea onchange="UserModule.updateField('${p.id}','firstmeet_notes',this.value)" class="w-full border p-2 rounded mb-4" rows="4">${p.firstmeet_notes||''}</textarea><div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300"><h4 class="font-bold text-slate-700 text-sm mb-2"><i class="fas fa-cloud-upload-alt mr-2"></i>Bukti First Meet (Foto/Absensi)</h4><div class="space-y-3"><input type="file" onchange="UserModule.uploadFile('${p.id}','proofs',this.files[0],'firstmeet_proof')" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /><input value="${p.firstmeet_proof||''}" onchange="UserModule.updateField('${p.id}','firstmeet_proof',this.value)" class="w-full border p-2 rounded text-sm bg-white" placeholder="Tempel Link Google Drive / Dropbox disini">${p.firstmeet_proof ? `<div class="mt-2"><img src="${p.firstmeet_proof}" class="h-32 rounded border shadow-sm object-cover hover:h-auto"><a href="${p.firstmeet_proof}" target="_blank" class="text-xs text-blue-500 underline block mt-1">Lihat Gambar Full</a></div>` : ''}</div></div>`;
             } else if (sid === 5) {
@@ -511,19 +558,11 @@
             if(table === 'budgets') { delete d.total_price; if(category) d.item_name = `[${category}] ${d.item_name}`; }
             if (d.id) await Core.supabase.from(table).update(d).eq('id', d.id); else { delete d.id; await Core.supabase.from(table).insert(d); }
             if(table === 'budgets') await UserModule.syncBudgetToFinance(pid);
-            Core.toggleModal('modal-generic'); 
-            
-            // FIX: Smart Reload based on table
-            let step = 1;
-            if (table === 'budgets' || table === 'rundowns') step = 2;
-            else if (table === 'volunteers') step = 3;
-            else if (table === 'project_games') step = 1;
-            
-            UserModule.openProjectDetail(pid, step);
+            Core.toggleModal('modal-generic'); let step = table === 'budgets' ? 2 : 1; UserModule.openProjectDetail(pid, step);
         };
         UserModule.editBudget = (pid, item) => { Core.openGenericModal('Edit Budget', `<form onsubmit="event.preventDefault(); UserModule.saveItem('budgets', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><label>Nama Item</label><input name="item_name" value="${item.item_name}" class="w-full border p-2 mb-2" required><div class="flex gap-2"><input name="quantity" type="number" value="${item.quantity}" class="w-full border p-2" oninput="UserModule.calcTotal(this.form)"><input name="unit_price" type="number" value="${item.unit_price}" class="w-full border p-2" oninput="UserModule.calcTotal(this.form)"></div><input name="total_price" readonly value="${item.total_price}" class="w-full border p-2 bg-slate-100 mt-2"><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); },
         UserModule.editGame = (pid, item) => { Core.openGenericModal('Edit Game', `<form onsubmit="event.preventDefault(); UserModule.saveItem('project_games', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><label>Nama Game</label><input name="title" value="${item.title}" class="w-full border p-2 mb-2" required><label>Link</label><input name="link" value="${item.link || ''}" class="w-full border p-2 mb-4"><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); },
-        UserModule.editRundown = (pid, item) => { Core.openGenericModal('Edit Rundown', `<form onsubmit="event.preventDefault(); UserModule.saveItem('rundowns', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><div class="flex gap-2 mb-2"><input type="time" name="time_start" value="${item.time_start}" class="w-full border p-2 rounded"><input type="time" name="time_end" value="${item.time_end}" class="w-full border p-2 rounded"></div><input name="activity" value="${item.activity}" class="w-full border p-2 rounded mt-2" required><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); },
+        UserModule.editRundown = (pid, item) => { Core.openGenericModal('Edit Rundown', `<form onsubmit="event.preventDefault(); UserModule.saveItem('rundowns', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><div class="flex gap-2"><input type="time" name="time_start" value="${item.time_start}" class="w-full border p-2"><input type="time" name="time_end" value="${item.time_end}" class="w-full border p-2"></div><input name="activity" value="${item.activity}" class="w-full border p-2 mt-2" required><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); },
         UserModule.editVolunteer = (pid, item) => { Core.openGenericModal('Edit Volunteer', `<form onsubmit="event.preventDefault(); UserModule.saveItem('volunteers', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><input name="role_name" value="${item.role_name}" class="w-full border p-2 mb-2" required><input name="count" value="${item.count}" class="w-full border p-2 mb-4"><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); },
         UserModule.calcTotal = (form) => { form.total_price.value = (parseFloat(form.quantity.value)||0) * (parseFloat(form.unit_price.value)||0); },
         
