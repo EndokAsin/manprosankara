@@ -116,7 +116,6 @@
 
     <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div class="h-1.5 w-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 absolute top-0 left-0 z-30"></div>
-        
         <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
             <div class="font-bold text-green-700 text-lg md:hidden flex items-center">
                 <i class="fas fa-hand-holding-heart mr-2"></i>SANKARA PM
@@ -199,7 +198,7 @@
         UserModule.loadData = async () => {
             const { data } = await Core.supabase
                 .from('projects')
-                .select('*, project_approvals(step_number, status)')
+                .select('*, project_approvals(step_number, status, notes)')
                 .order('event_date');
             UserModule.projects = data || [];
         };
@@ -218,19 +217,13 @@
             let dbStep = parseInt(p.step) || 1;
             let effectiveStep = 1;
 
-            if (step6 && step6.status === 'approved') {
-                effectiveStep = 6;
-            } else {
-                if (step2 && step2.status === 'approved') {
-                    effectiveStep = Math.max(3, dbStep);
-                    effectiveStep = Math.min(5, effectiveStep);
-                } else if (step2 && step2.status === 'submitted') {
-                    effectiveStep = 2; // Menunggu Finance
-                } else {
-                    effectiveStep = Math.min(2, dbStep);
-                }
+            if (step6 && step6.status === 'approved') return 6;
+            if (step2 && step2.status === 'approved') {
+                return Math.max(3, Math.min(5, dbStep));
+            } else if (step2 && step2.status === 'submitted') {
+                return 2; 
             }
-            return effectiveStep;
+            return Math.min(2, dbStep);
         };
 
         UserModule.renderReferences = async (container) => {
@@ -415,18 +408,31 @@
             const status = getStatus(sid);
             const step = Core.SOP_STEPS.find(s => s.id === sid);
             
-            // LOGIC LOCKING REVISED:
-            // Check if step 2 is approved.
+            // Logic Locking Revised:
             const isFinanceApproved = getStatus(2) === 'approved';
-            // Is this step locked? (Lock steps 3,4,5,6 if Finance not approved)
-            const isStepLocked = (sid > 2 && !isFinanceApproved);
+            const isLocked = isFinanceApproved; // Used for disable inputs in step 2
 
             let controls = '';
             if(step.requiresApproval) {
                 if(status === 'pending') controls = `<button onclick="UserModule.submitApproval('${p.id}', ${sid})" class="bg-blue-600 text-white w-full py-2 rounded font-bold">Ajukan ke Finance</button>`;
                 else if(status === 'submitted') controls = `<div class="bg-yellow-50 text-yellow-800 p-4 rounded text-center border border-yellow-200">Menunggu Verifikasi Finance<br><span class="text-xs">Hubungi Admin Finance</span></div>`;
                 else if(status === 'approved') controls = `<div class="bg-green-50 text-green-800 p-3 rounded text-center font-bold mb-2 border border-green-200">Disetujui oleh Finance</div>${sid<6 ? `<button onclick="UserModule.advanceStep('${p.id}',${sid+1})" class="bg-slate-100 w-full py-2 rounded hover:bg-slate-200 transition font-bold border border-slate-300">Lanjut Step ${sid+1}</button>`:''}`;
-                else controls = `<div class="bg-red-50 text-red-800 p-3 rounded text-center mb-2 border border-red-200">Ditolak: ${r.approvals.find(a=>a.step_number===sid)?.notes || '-'}</div><button onclick="UserModule.submitApproval('${p.id}',${sid})" class="bg-slate-600 text-white w-full py-2 rounded hover:bg-slate-700 transition">Ajukan Ulang</button>`;
+                else {
+                    // Rejected State
+                    const note = r.approvals.find(a=>a.step_number===sid)?.notes || '-';
+                    controls = `
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r shadow-sm text-left">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-circle text-red-500 mt-0.5 mr-2"></i>
+                            <div>
+                                <h4 class="text-red-800 font-bold text-sm">Pengajuan Ditolak</h4>
+                                <p class="text-red-700 text-sm mt-1">"${note}"</p>
+                                <p class="text-red-600 text-xs mt-2 italic">Silakan revisi data di atas sesuai catatan, lalu ajukan ulang.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="UserModule.submitApproval('${p.id}',${sid})" class="bg-slate-700 text-white w-full py-3 rounded-xl hover:bg-slate-800 transition font-bold shadow-lg flex justify-center items-center gap-2"><i class="fas fa-paper-plane"></i> Ajukan Ulang</button>`;
+                }
             } else {
                 controls = `<button onclick="UserModule.advanceStep('${p.id}',${sid+1})" class="bg-teal-600 text-white w-full py-2 rounded font-bold hover:bg-teal-700 transition">Selesai, Lanjut</button>`;
             }
@@ -436,20 +442,17 @@
                 const st = getStatus(s.id);
                 const icon = st === 'approved' ? 'fa-check text-green-500' : 'fa-circle text-slate-300';
                 let locked = false;
-                // Allow user to navigate freely up to current step + 1, OR if Finance Approved (unlocks all non-approval steps for viewing)
-                // If Finance approved (Step 2), unlock step 3,4,5. Step 6 needs its own flow.
-                if (s.id > 2 && !isFinanceApproved) locked = true;
                 
+                const dbStep = parseInt(p.step) || 1;
+                if (s.id > dbStep + 1) locked = true;
+                if (s.id > 2 && getStatus(2) !== 'approved') locked = true;
+
                 return `<button onclick="${locked?'':`UserModule.openProjectDetail('${p.id}',${s.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl mx-1 ${sid===s.id?'bg-green-600 text-white':'bg-white text-slate-600 border'} ${locked?'opacity-50 cursor-not-allowed': 'hover:shadow-md'}"><div class="text-xs font-bold">Tahap ${s.id}</div><div class="text-[10px]">${s.name}</div><i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i></button>`;
             }).join('');
 
             let body = `<div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded mb-6"><p class="font-bold text-sm">Deadline: ${step.desc}</p></div>`;
             const pJson = JSON.stringify({id: p.id, title: p.title, event_date: p.event_date, location: p.location, regional: p.regional, leader: p.leader}).replace(/"/g, '&quot;');
             const infoCard = `<div class="bg-white border p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row justify-between items-start md:items-center"><div><div class="flex items-center gap-2 mb-1"><span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">${p.regional}</span><h1 class="text-xl font-bold text-slate-800">${p.title}</h1><button onclick="UserModule.openEditProjectModal(${pJson})" class="text-slate-400 hover:text-blue-600"><i class="fas fa-pencil-alt"></i></button></div><div class="flex gap-4 text-sm text-slate-500 mt-2"><div class="flex items-center gap-1"><i class="fas fa-user-circle text-gray-400"></i> ${p.leader || '-'}</div><div class="flex items-center gap-1"><i class="fas fa-map-marker-alt text-gray-400"></i> ${p.location || '-'}</div><div class="flex items-center gap-1"><i class="fas fa-calendar-alt text-gray-400"></i> ${Core.formatDate(p.event_date)}</div></div></div></div>`;
-
-            // RENDER BODY CONTENT BASED ON STEP
-            // Apply isLocked check for edit buttons
-            const isLocked = isFinanceApproved; // Lock editing if finance approved
 
             if (sid === 2) {
                 let defDelegates = p.estimated_delegates || UserModule.rabInputs.delegates || 0;
@@ -474,9 +477,9 @@
                 };
 
                 const getStatusColor = (act, lim) => act > lim ? 'text-red-600 font-bold' : 'text-green-600';
-                // Hide Save button if Locked
-                const calcButton = isLocked ? '<div class="text-xs text-green-600 font-bold mb-4"><i class="fas fa-lock"></i> Anggaran Telah Disetujui (Terkunci)</div>' : '<button onclick="UserModule.updateCalculator()" class="w-full bg-blue-600 text-white py-2 rounded mb-4 font-bold hover:bg-blue-700 transition shadow-sm"><i class="fas fa-save mr-2"></i>Simpan & Hitung</button>';
                 
+                const calcButton = isLocked ? '<div class="text-xs text-green-600 font-bold mb-4"><i class="fas fa-lock"></i> Anggaran Telah Disetujui (Terkunci)</div>' : '<button onclick="UserModule.updateCalculator()" class="w-full bg-blue-600 text-white py-2 rounded mb-4 font-bold hover:bg-blue-700 transition shadow-sm"><i class="fas fa-save mr-2"></i>Simpan & Hitung</button>';
+
                 const calcHtml = `<div class="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6"><h4 class="font-bold text-gray-700 mb-4 border-b pb-2"><i class="fas fa-calculator mr-2"></i>Perencanaan Anggaran</h4><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="block text-xs font-bold text-gray-500 mb-1">Jumlah Delegasi</label><input id="calc-delegates" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defDelegates}" ${isLocked?'disabled':''}></div><div><label class="block text-xs font-bold text-slate-500 mb-1">Harga Volunteer (Rp)</label><input id="calc-price" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defPrice}" ${isLocked?'disabled':''}></div></div>${calcButton}<div class="flex justify-between items-center bg-blue-100 p-3 rounded mb-4"><span class="text-sm font-bold text-blue-800">Total Pemasukan (Estimasi):</span><span id="calc-income" class="text-lg font-bold text-blue-900">${Core.formatCurrency(totalIncome)}</span></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs"><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen A (Alat & Bahan) - 40%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-A">${Core.formatCurrency(limits['Komponen A'])}</span></span><span class="${getStatusColor(actuals['Komponen A'], limits['Komponen A'])}">Pakai: ${Core.formatCurrency(actuals['Komponen A'])}</span></div></div><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen B (Konsumsi) - 20%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-B">${Core.formatCurrency(limits['Komponen B'])}</span></span><span class="${getStatusColor(actuals['Komponen B'], limits['Komponen B'])}">Pakai: ${Core.formatCurrency(actuals['Komponen B'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen C (Fixed) - Auto</div><div class="flex justify-between items-center"><span class="text-gray-500">Tetap: 500rb</span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen C'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen D (Lain-lain) - Auto 10%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-D">${Core.formatCurrency(limits['Komponen D'])}</span></span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen D'])}</span></div></div></div></div>`;
 
                 const renderCategoryRows = (catName, title, isAuto = false) => {
@@ -486,10 +489,7 @@
                         const bJson = JSON.stringify(b).replace(/"/g, '&quot;');
                         const cleanName = b.item_name.replace(/^\[.*?\]\s/, '');
                         const hasInvoice = b.invoice_url ? true : false;
-                        // Hide edit/delete if locked or auto
-                        const actionButtons = (isAuto || isLocked) ? 
-                            (hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-green-600"><i class="fas fa-file-invoice"></i></a>` : '') : 
-                            `<div class="flex items-center gap-1 justify-end">${hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-[10px] text-green-600 hover:text-green-800 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1" title="Lihat Invoice"><i class="fas fa-eye"></i></a>` : ''}<label class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1" title="${hasInvoice ? 'Ganti Invoice' : 'Upload Invoice'}"><i class="fas fa-upload"></i> ${hasInvoice ? 'Ganti' : 'Upload'}<input type="file" class="hidden" onchange="UserModule.uploadBudgetProof('${p.id}', '${b.id}', this.files[0])"></label><button onclick="UserModule.editBudget('${p.id}', ${bJson})" class="text-[10px] text-slate-500 hover:text-blue-500 p-1"><i class="fas fa-pen"></i></button><button onclick="UserModule.deleteItem('budgets', '${b.id}', '${p.id}')" class="text-[10px] text-slate-500 hover:text-red-500 p-1"><i class="fas fa-trash"></i></button></div>`;
+                        const actionButtons = (isAuto || isLocked) ? (hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-green-600"><i class="fas fa-file-invoice"></i></a>` : '') : `<div class="flex items-center gap-1 justify-end">${hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-[10px] text-green-600 hover:text-green-800 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1" title="Lihat Invoice"><i class="fas fa-eye"></i></a>` : ''}<label class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1" title="${hasInvoice ? 'Ganti Invoice' : 'Upload Invoice'}"><i class="fas fa-upload"></i> ${hasInvoice ? 'Ganti' : 'Upload'}<input type="file" class="hidden" onchange="UserModule.uploadBudgetProof('${p.id}', '${b.id}', this.files[0])"></label><button onclick="UserModule.editBudget('${p.id}', ${bJson})" class="text-[10px] text-slate-500 hover:text-blue-500 p-1"><i class="fas fa-pen"></i></button><button onclick="UserModule.deleteItem('budgets', '${b.id}', '${p.id}')" class="text-[10px] text-slate-500 hover:text-red-500 p-1"><i class="fas fa-trash"></i></button></div>`;
                         return `<div class="flex justify-between items-center border-b pb-2 pt-2 hover:bg-slate-50 text-xs pl-2 pr-2"><div class="flex-1"><div class="font-medium text-slate-800">${cleanName}</div><div class="text-[10px] text-slate-500 mt-1">${b.quantity} x ${Core.formatCurrency(b.unit_price)} ${hasInvoice ? '<span class="ml-1 text-green-600 flex items-center gap-1 inline-flex"><i class="fas fa-check-circle"></i> Ada Bukti</span>' : ''}</div></div><div class="text-right"><div class="font-bold text-slate-700 mb-1">${Core.formatCurrency(b.total_price)}</div><div class="flex justify-end">${actionButtons}</div></div></div>`;
                     }).join('');
                     const subtotal = items.reduce((sum, b) => sum + (b.total_price||0), 0);
@@ -516,7 +516,7 @@
             } else if (sid === 3) {
                     const volRows = (r.volunteers||[]).map(v => { const vJson = JSON.stringify(v).replace(/"/g, '&quot;'); return `<div class="bg-slate-50 p-2 rounded border text-sm flex justify-between items-center"><span>${v.role_name}</span><div class="flex gap-2 font-bold items-center"><span>${v.count}</span><div class="flex gap-1 border-l pl-2 ml-2 border-slate-300"><button onclick="UserModule.editVolunteer('${p.id}', ${vJson})" class="text-blue-500 font-normal hover:text-blue-700"><i class="fas fa-edit"></i></button><button onclick="UserModule.deleteItem('volunteers', '${v.id}', '${p.id}')" class="text-red-400 font-normal hover:text-red-600"><i class="fas fa-trash"></i></button></div></div></div>`; }).join('');
                     const isFinanceApproved = getStatus(2) === 'approved';
-                    body += `<div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 transition">+ Divisi</button></div><div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div><label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>${isFinanceApproved ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Rundown & RAB)</button>` : ''}`;
+                    body += `<div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 transition">+ Divisi</button></div><div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div><label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>${isFinanceApproved ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Rundown & RAB)</button>` : '<div class="text-xs text-orange-500 italic mt-2 text-center bg-orange-50 p-2 rounded">Tombol download PDF akan muncul setelah Finance disetujui.</div>'}`;
             } else if (sid === 4) {
                 body += `<label class="text-xs font-bold text-slate-500">CATATAN FIRST MEET</label><textarea onchange="UserModule.updateField('${p.id}','firstmeet_notes',this.value)" class="w-full border p-2 rounded mb-4" rows="4">${p.firstmeet_notes||''}</textarea><div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300"><h4 class="font-bold text-slate-700 text-sm mb-2"><i class="fas fa-cloud-upload-alt mr-2"></i>Bukti First Meet (Foto/Absensi)</h4><div class="space-y-3"><input type="file" onchange="UserModule.uploadFile('${p.id}','proofs',this.files[0],'firstmeet_proof')" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /><input value="${p.firstmeet_proof||''}" onchange="UserModule.updateField('${p.id}','firstmeet_proof',this.value)" class="w-full border p-2 rounded text-sm bg-white" placeholder="Tempel Link Google Drive / Dropbox disini">${p.firstmeet_proof ? `<div class="mt-2"><img src="${p.firstmeet_proof}" class="h-32 rounded border shadow-sm object-cover hover:h-auto"><a href="${p.firstmeet_proof}" target="_blank" class="text-xs text-blue-500 underline block mt-1">Lihat Gambar Full</a></div>` : ''}</div></div>`;
             } else if (sid === 5) {
@@ -526,73 +526,6 @@
             }
 
             container.innerHTML = `<div class="fade-in pb-20"><button onclick="App.router('projects')" class="text-sm mb-4"><i class="fas fa-arrow-left"></i> Kembali</button>${infoCard}<div class="flex overflow-x-auto pb-4 mb-4">${stepsHtml}</div><div class="bg-white rounded-2xl p-6 border shadow-sm mb-6"><div>${body}</div><div class="mt-4 pt-4 border-t">${controls}</div></div></div>`;
-        };
-        
-        // ... (Rest of the functions: autoUpsertFixedItems, submitApproval, addItemModal, saveItem, editBudget, etc. same as above)
-        
-        UserModule.autoUpsertFixedItems = async (pid, valC, valD) => {
-            const { data: existingC } = await Core.supabase.from('budgets').select('id').eq('project_id', pid).ilike('item_name', '[Komponen C]%').single();
-            const dataC = { project_id: pid, item_name: '[Komponen C] Fixed Cost (Sewa, dll)', quantity: 1, unit_price: valC }; 
-            if(existingC) await Core.supabase.from('budgets').update({ unit_price: valC }).eq('id', existingC.id); else await Core.supabase.from('budgets').insert(dataC);
-            const { data: existingD } = await Core.supabase.from('budgets').select('id').eq('project_id', pid).ilike('item_name', '[Komponen D]%').single();
-            const dataD = { project_id: pid, item_name: '[Komponen D] Lain-lain (Promo, Merchandise)', quantity: 1, unit_price: valD };
-            if(existingD) await Core.supabase.from('budgets').update({ unit_price: valD }).eq('id', existingD.id); else await Core.supabase.from('budgets').insert(dataD);
-            await UserModule.syncBudgetToFinance(pid);
-            UserModule.openProjectDetail(pid, 2);
-        };
-        UserModule.submitApproval = async (id, step) => { 
-            await Core.supabase.from('project_approvals').upsert({ project_id: id, step_number: step, status: 'submitted', submitted_at: new Date().toISOString(), notes: null }, { onConflict: 'project_id, step_number' });
-            if (step === 2) await Core.supabase.from('projects').update({ finance_status: 'Pending' }).eq('id', id);
-            Core.showToast('Diajukan ke Finance'); UserModule.openProjectDetail(id, step); 
-        };
-        UserModule.addItemModal = (table, pid, preselectedCategory = '') => {
-            let html = `<input name="item_name" placeholder="Item" class="w-full border p-2 mb-2" required><div class="flex gap-2"><input name="quantity" type="number" class="w-full border p-2" placeholder="Qty"><input name="unit_price" type="number" class="w-full border p-2" placeholder="Harga"></div><input name="total_price" readonly class="w-full border p-2 bg-gray-100 mt-2">`;
-            if (table === 'rundowns') {
-                html = `<div class="flex gap-2 mb-2"><input type="time" name="time_start" class="w-full border p-2 rounded" required><input type="time" name="time_end" class="w-full border p-2 rounded" required></div><input name="activity" placeholder="Nama Kegiatan" class="w-full border p-2 rounded mb-2" required>`;
-            }
-            const saveFn = table === 'budgets' ? `UserModule.saveItem('${table}','${pid}',this, '${preselectedCategory}')` : `UserModule.saveItem('${table}','${pid}',this)`;
-            Core.openGenericModal('Tambah', `<form onsubmit="event.preventDefault();${saveFn}">${html}<button class="w-full bg-green-600 text-white py-2 mt-2 rounded">Simpan</button></form>`);
-        };
-        UserModule.saveItem = async (table, pid, form, category = null) => {
-            const d = Object.fromEntries(new FormData(form)); d.project_id = pid;
-            if(table === 'budgets') { delete d.total_price; if(category) d.item_name = `[${category}] ${d.item_name}`; }
-            if (d.id) await Core.supabase.from(table).update(d).eq('id', d.id); else { delete d.id; await Core.supabase.from(table).insert(d); }
-            if(table === 'budgets') await UserModule.syncBudgetToFinance(pid);
-            Core.toggleModal('modal-generic'); let step = table === 'budgets' ? 2 : 1; UserModule.openProjectDetail(pid, step);
-        };
-        UserModule.editBudget = (pid, item) => { Core.openGenericModal('Edit Budget', `<form onsubmit="event.preventDefault(); UserModule.saveItem('budgets', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><label>Nama Item</label><input name="item_name" value="${item.item_name}" class="w-full border p-2 mb-2" required><div class="flex gap-2"><input name="quantity" type="number" value="${item.quantity}" class="w-full border p-2" oninput="UserModule.calcTotal(this.form)"><input name="unit_price" type="number" value="${item.unit_price}" class="w-full border p-2" oninput="UserModule.calcTotal(this.form)"></div><input name="total_price" readonly value="${item.total_price}" class="w-full border p-2 bg-slate-100 mt-2"><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); },
-        UserModule.editGame = (pid, item) => { Core.openGenericModal('Edit Game', `<form onsubmit="event.preventDefault(); UserModule.saveItem('project_games', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><label>Nama Game</label><input name="title" value="${item.title}" class="w-full border p-2 mb-2" required><label>Link</label><input name="link" value="${item.link || ''}" class="w-full border p-2 mb-4"><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); },
-        UserModule.editRundown = (pid, item) => { Core.openGenericModal('Edit Rundown', `<form onsubmit="event.preventDefault(); UserModule.saveItem('rundowns', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><div class="flex gap-2"><input type="time" name="time_start" value="${item.time_start}" class="w-full border p-2"><input type="time" name="time_end" value="${item.time_end}" class="w-full border p-2"></div><input name="activity" value="${item.activity}" class="w-full border p-2 mt-2" required><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); },
-        UserModule.editVolunteer = (pid, item) => { Core.openGenericModal('Edit Volunteer', `<form onsubmit="event.preventDefault(); UserModule.saveItem('volunteers', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><input name="role_name" value="${item.role_name}" class="w-full border p-2 mb-2" required><input name="count" value="${item.count}" class="w-full border p-2 mb-4"><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); },
-        UserModule.calcTotal = (form) => { form.total_price.value = (parseFloat(form.quantity.value)||0) * (parseFloat(form.unit_price.value)||0); },
-        
-        // FIX: Improved deleteItem with Step Redirect
-        UserModule.deleteItem = async (table, id, pid) => { 
-            if(!await Core.confirm('Hapus item ini?')) return; 
-            const { error } = await Core.supabase.from(table).delete().eq('id', id); 
-            if (error) { Core.showToast('Gagal hapus: ' + error.message); return; }
-            
-            if(table==='budgets') await UserModule.syncBudgetToFinance(pid); 
-            
-            // Determine redirect step
-            let step = 1;
-            if (table === 'budgets' || table === 'rundowns') step = 2;
-            else if (table === 'volunteers') step = 3;
-            else if (table === 'project_games') step = 1;
-
-            UserModule.openProjectDetail(pid, step); 
-        },
-
-        UserModule.syncBudgetToFinance = async (pid) => { const { data: budgets } = await Core.supabase.from('budgets').select('total_price').eq('project_id', pid); const total = budgets ? budgets.reduce((sum, item) => sum + (item.total_price || 0), 0) : 0; const { data: p } = await Core.supabase.from('projects').select('title, regional').eq('id', pid).single(); if (p) await Core.supabase.from('events').upsert({ region: p.regional, name: p.title, budget_limit: total, status: 'active' }, { onConflict: 'region,name' }); },
-        UserModule.openEditProjectModal = async (p) => { const regions = await Core.fetchRegions(); const options = regions.map(r => `<option value="${r.name}">${r.name}</option>`).join(''); Core.openGenericModal('Edit Info', `<form onsubmit="event.preventDefault();UserModule.updateProjectDetails(this,'${p.id}')"><label>Nama</label><input name="title" value="${p.title}" class="w-full border p-2 mb-2"><label>Regional</label><select name="regional" class="w-full border p-2 mb-2">${options}</select><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); },
-        UserModule.updateProjectDetails = async (form, pid) => { const d = Object.fromEntries(new FormData(form)); await Core.supabase.from('projects').update(d).eq('id', pid); Core.toggleModal('modal-generic'); UserModule.openProjectDetail(pid, 1); },
-        UserModule.updateField = async (id, col, val) => { const { error } = await Core.supabase.from('projects').update({[col]: val}).eq('id', id); if(error) { Core.showToast('Gagal Simpan DB: ' + error.message); return false; } if (col === 'title' || col === 'regional') UserModule.syncBudgetToFinance(id); Core.showToast('Tersimpan'); return true; },
-        UserModule.uploadFile = async (pid, bucket, file, dbCol) => { if(!file || file.size > 500 * 1024) return; const fileName = `${pid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`; const { error } = await Core.supabase.storage.from(bucket).upload(fileName, file); if(!error) { const { data } = Core.supabase.storage.from(bucket).getPublicUrl(fileName); const success = await UserModule.updateField(pid, dbCol, data.publicUrl); if(success) setTimeout(() => UserModule.openProjectDetail(pid, dbCol === 'firstmeet_proof' ? 4 : 6), 1000); } },
-        // submitApproval now calls the updated version with validation logic above
-        UserModule.renderGanttChart = (list) => {
-            if(!list.length) return '';
-            const h = Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 text-center text-xs border-r">${i-10}</div>`).join('');
-            return `<div class="min-w-[600px]"><div class="flex border-b pb-1"><div class="w-40 shrink-0">Project</div><div class="flex">${h}</div></div>${list.map(p=>`<div class="flex border-b py-1 hover:bg-slate-50"><div class="w-40 shrink-0 truncate pr-2 text-sm">${p.title}</div><div class="flex">${Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 border-r h-4 ${i===10?'bg-green-500':''}"></div>`).join('')}</div></div>`).join('')}</div>`;
         };
         
         // --- ADDED MISSING FUNCTION ---
@@ -622,6 +555,134 @@
                 Core.showToast('Invoice Terupload');
                 UserModule.openProjectDetail(pid, 2);
             }
+        };
+
+        // --- NEW: SYSTEM-SIDE OVERBUDGET PROTECTION ---
+        UserModule.submitApproval = async (id, step) => { 
+            if (step === 2) {
+                // Fetch latest data to verify limits before submission
+                const { data: project } = await Core.supabase.from('projects').select('estimated_delegates, volunteer_price').eq('id', id).single();
+                const { data: budgets } = await Core.supabase.from('budgets').select('item_name, total_price').eq('project_id', id);
+
+                const income = (project.estimated_delegates || 0) * (project.volunteer_price || 0);
+                const limitA = income * 0.40;
+                const limitB = income * 0.20;
+
+                const actuals = { 'Komponen A': 0, 'Komponen B': 0 };
+                budgets.forEach(b => {
+                    const match = b.item_name.match(/^\[(Komponen [ABCD])\]/);
+                    if(match && match[1]) {
+                        if(actuals[match[1]] !== undefined) actuals[match[1]] += (b.total_price || 0);
+                    } else {
+                         actuals['Komponen A'] += (b.total_price || 0);
+                    }
+                });
+
+                let errors = [];
+                let suggestions = [];
+                
+                if (actuals['Komponen A'] > limitA) {
+                    const diff = actuals['Komponen A'] - limitA;
+                    errors.push(`Komponen A (Alat & Bahan) Over: ${Core.formatCurrency(diff)}`);
+                    suggestions.push(`Kurangi belanja alat/bahan sebesar ${Core.formatCurrency(diff)}`);
+                }
+                if (actuals['Komponen B'] > limitB) {
+                    const diff = actuals['Komponen B'] - limitB;
+                    errors.push(`Komponen B (Konsumsi) Over: ${Core.formatCurrency(diff)}`);
+                    suggestions.push(`Kurangi biaya konsumsi sebesar ${Core.formatCurrency(diff)}`);
+                }
+
+                if (errors.length > 0) {
+                    suggestions.push("Naikkan harga tiket volunteer");
+                    suggestions.push("Tambah target jumlah delegasi");
+
+                    Swal.fire({
+                        title: 'Pengajuan Ditolak Sistem',
+                        html: `
+                            <div class="text-left">
+                                <p class="text-red-600 font-bold mb-2">Anggaran melebihi batas (Overbudget):</p>
+                                <ul class="list-disc pl-5 text-sm text-red-500 mb-4">
+                                    ${errors.map(e => `<li>${e}</li>`).join('')}
+                                </ul>
+                                <div class="bg-blue-50 p-3 rounded border border-blue-100">
+                                    <p class="font-bold text-blue-800 mb-1 text-sm"><i class="fas fa-lightbulb mr-1"></i>Saran Perbaikan:</p>
+                                    <ul class="list-disc pl-5 text-sm text-blue-700">
+                                        ${suggestions.map(s => `<li>${s}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        `,
+                        icon: 'warning'
+                    });
+                    return; // Stop submission
+                }
+            }
+            
+            // Proceed if Valid
+            await Core.supabase.from('project_approvals').upsert({ project_id: id, step_number: step, status: 'submitted', submitted_at: new Date().toISOString(), notes: null }, { onConflict: 'project_id, step_number' });
+            if (step === 2) await Core.supabase.from('projects').update({ finance_status: 'Pending' }).eq('id', id);
+            Core.showToast('Diajukan ke Finance'); UserModule.openProjectDetail(id, step); 
+        };
+
+        // ... (Rest of functions like autoUpsertFixedItems, addItemModal, saveItem, editBudget, etc. same as above)
+        
+        UserModule.autoUpsertFixedItems = async (pid, valC, valD) => {
+            const { data: existingC } = await Core.supabase.from('budgets').select('id').eq('project_id', pid).ilike('item_name', '[Komponen C]%').single();
+            const dataC = { project_id: pid, item_name: '[Komponen C] Fixed Cost (Sewa, dll)', quantity: 1, unit_price: valC }; 
+            if(existingC) await Core.supabase.from('budgets').update({ unit_price: valC }).eq('id', existingC.id); else await Core.supabase.from('budgets').insert(dataC);
+            const { data: existingD } = await Core.supabase.from('budgets').select('id').eq('project_id', pid).ilike('item_name', '[Komponen D]%').single();
+            const dataD = { project_id: pid, item_name: '[Komponen D] Lain-lain (Promo, Merchandise)', quantity: 1, unit_price: valD };
+            if(existingD) await Core.supabase.from('budgets').update({ unit_price: valD }).eq('id', existingD.id); else await Core.supabase.from('budgets').insert(dataD);
+            await UserModule.syncBudgetToFinance(pid);
+            UserModule.openProjectDetail(pid, 2);
+        };
+        UserModule.addItemModal = (table, pid, preselectedCategory = '') => {
+            let html = `<input name="item_name" placeholder="Item" class="w-full border p-2 mb-2" required><div class="flex gap-2"><input name="quantity" type="number" class="w-full border p-2" placeholder="Qty" oninput="UserModule.calcTotal(this.form)"><input name="unit_price" type="number" class="w-full border p-2" placeholder="Harga" oninput="UserModule.calcTotal(this.form)"></div><input name="total_price" readonly class="w-full border p-2 bg-gray-100 mt-2">`;
+            if (table === 'rundowns') {
+                html = `<div class="flex gap-2 mb-2"><input type="time" name="time_start" class="w-full border p-2 rounded" required><input type="time" name="time_end" class="w-full border p-2 rounded" required></div><input name="activity" placeholder="Nama Kegiatan" class="w-full border p-2 rounded mb-2" required>`;
+            }
+            const saveFn = table === 'budgets' ? `UserModule.saveItem('${table}','${pid}',this, '${preselectedCategory}')` : `UserModule.saveItem('${table}','${pid}',this)`;
+            Core.openGenericModal('Tambah', `<form onsubmit="event.preventDefault();${saveFn}">${html}<button class="w-full bg-green-600 text-white py-2 mt-2 rounded">Simpan</button></form>`);
+        };
+        UserModule.saveItem = async (table, pid, form, category = null) => {
+            const d = Object.fromEntries(new FormData(form)); d.project_id = pid;
+            if(table === 'budgets') { delete d.total_price; if(category) d.item_name = `[${category}] ${d.item_name}`; }
+            if (d.id) await Core.supabase.from(table).update(d).eq('id', d.id); else { delete d.id; await Core.supabase.from(table).insert(d); }
+            if(table === 'budgets') await UserModule.syncBudgetToFinance(pid);
+            Core.toggleModal('modal-generic'); 
+            let step = 1;
+            if (table === 'budgets' || table === 'rundowns') step = 2;
+            else if (table === 'volunteers') step = 3;
+            else if (table === 'project_games') step = 1;
+            UserModule.openProjectDetail(pid, step);
+        };
+        UserModule.editBudget = (pid, item) => { Core.openGenericModal('Edit Budget', `<form onsubmit="event.preventDefault(); UserModule.saveItem('budgets', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><label>Nama Item</label><input name="item_name" value="${item.item_name}" class="w-full border p-2 mb-2" required><div class="flex gap-2"><input name="quantity" type="number" value="${item.quantity}" class="w-full border p-2" oninput="UserModule.calcTotal(this.form)"><input name="unit_price" type="number" value="${item.unit_price}" class="w-full border p-2" oninput="UserModule.calcTotal(this.form)"></div><input name="total_price" readonly value="${item.total_price}" class="w-full border p-2 bg-slate-100 mt-2"><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); };
+        UserModule.editGame = (pid, item) => { Core.openGenericModal('Edit Game', `<form onsubmit="event.preventDefault(); UserModule.saveItem('project_games', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><label>Nama Game</label><input name="title" value="${item.title}" class="w-full border p-2 mb-2" required><label>Link</label><input name="link" value="${item.link || ''}" class="w-full border p-2 mb-4"><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); };
+        UserModule.editRundown = (pid, item) => { Core.openGenericModal('Edit Rundown', `<form onsubmit="event.preventDefault(); UserModule.saveItem('rundowns', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><div class="flex gap-2"><input type="time" name="time_start" value="${item.time_start}" class="w-full border p-2"><input type="time" name="time_end" value="${item.time_end}" class="w-full border p-2"></div><input name="activity" value="${item.activity}" class="w-full border p-2 mt-2" required><button class="w-full bg-blue-600 text-white py-2 mt-2 rounded">Update</button></form>`); };
+        UserModule.editVolunteer = (pid, item) => { Core.openGenericModal('Edit Volunteer', `<form onsubmit="event.preventDefault(); UserModule.saveItem('volunteers', '${pid}', this)"><input type="hidden" name="id" value="${item.id}"><input name="role_name" value="${item.role_name}" class="w-full border p-2 mb-2" required><input name="count" value="${item.count}" class="w-full border p-2 mb-4"><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); };
+        UserModule.calcTotal = (form) => { form.total_price.value = (parseFloat(form.quantity.value)||0) * (parseFloat(form.unit_price.value)||0); };
+        
+        UserModule.deleteItem = async (table, id, pid) => { 
+            if(!await Core.confirm('Hapus item ini?')) return; 
+            const { error } = await Core.supabase.from(table).delete().eq('id', id); 
+            if (error) { Core.showToast('Gagal hapus: ' + error.message); return; }
+            if(table==='budgets') await UserModule.syncBudgetToFinance(pid); 
+            let step = 1;
+            if (table === 'budgets' || table === 'rundowns') step = 2;
+            else if (table === 'volunteers') step = 3;
+            else if (table === 'project_games') step = 1;
+            UserModule.openProjectDetail(pid, step); 
+        };
+
+        UserModule.syncBudgetToFinance = async (pid) => { const { data: budgets } = await Core.supabase.from('budgets').select('total_price').eq('project_id', pid); const total = budgets ? budgets.reduce((sum, item) => sum + (item.total_price || 0), 0) : 0; const { data: p } = await Core.supabase.from('projects').select('title, regional').eq('id', pid).single(); if (p) await Core.supabase.from('events').upsert({ region: p.regional, name: p.title, budget_limit: total, status: 'active' }, { onConflict: 'region,name' }); };
+        UserModule.openEditProjectModal = async (p) => { const regions = await Core.fetchRegions(); const options = regions.map(r => `<option value="${r.name}">${r.name}</option>`).join(''); Core.openGenericModal('Edit Info', `<form onsubmit="event.preventDefault();UserModule.updateProjectDetails(this,'${p.id}')"><label>Nama</label><input name="title" value="${p.title}" class="w-full border p-2 mb-2"><label>Regional</label><select name="regional" class="w-full border p-2 mb-2">${options}</select><button class="w-full bg-blue-600 text-white py-2 rounded">Update</button></form>`); };
+        UserModule.updateProjectDetails = async (form, pid) => { const d = Object.fromEntries(new FormData(form)); await Core.supabase.from('projects').update(d).eq('id', pid); Core.toggleModal('modal-generic'); UserModule.openProjectDetail(pid, 1); };
+        UserModule.updateField = async (id, col, val) => { const { error } = await Core.supabase.from('projects').update({[col]: val}).eq('id', id); if(error) { Core.showToast('Gagal Simpan DB: ' + error.message); return false; } if (col === 'title' || col === 'regional') UserModule.syncBudgetToFinance(id); Core.showToast('Tersimpan'); return true; };
+        UserModule.uploadFile = async (pid, bucket, file, dbCol) => { if(!file || file.size > 500 * 1024) return; const fileName = `${pid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`; const { error } = await Core.supabase.storage.from(bucket).upload(fileName, file); if(!error) { const { data } = Core.supabase.storage.from(bucket).getPublicUrl(fileName); const success = await UserModule.updateField(pid, dbCol, data.publicUrl); if(success) setTimeout(() => UserModule.openProjectDetail(pid, dbCol === 'firstmeet_proof' ? 4 : 6), 1000); } };
+        UserModule.renderGanttChart = (list) => {
+            if(!list.length) return '';
+            const h = Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 text-center text-xs border-r">${i-10}</div>`).join('');
+            return `<div class="min-w-[600px]"><div class="flex border-b pb-1"><div class="w-40 shrink-0">Project</div><div class="flex">${h}</div></div>${list.map(p=>`<div class="flex border-b py-1 hover:bg-slate-50"><div class="w-40 shrink-0 truncate pr-2 text-sm">${p.title}</div><div class="flex">${Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 border-r h-4 ${i===10?'bg-green-500':''}"></div>`).join('')}</div></div>`).join('')}</div>`;
         };
 
         const App = {
