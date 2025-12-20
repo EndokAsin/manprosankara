@@ -35,15 +35,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         
         .gantt-cell:hover .gantt-tooltip { display: block; }
-        .today-line {
-            position: absolute; top: 0; bottom: 0; width: 2px; background-color: #ef4444; 
-            z-index: 50; border-left: 1px dashed #ef4444; pointer-events: none;
-        }
-        .today-label {
-            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
-            background: #ef4444; color: white; font-size: 10px; padding: 2px 4px; rounded: 4px;
-            white-space: nowrap; z-index: 51;
-        }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen flex overflow-hidden">
@@ -56,7 +47,6 @@
         </div>
     </div>
 
-    <!-- Generic Modal -->
     <div id="modal-generic" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col">
             <div class="bg-slate-50 px-6 py-4 border-b flex justify-between items-center shrink-0">
@@ -116,6 +106,7 @@
 
     <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div class="h-1.5 w-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 absolute top-0 left-0 z-30"></div>
+        
         <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
             <div class="font-bold text-green-700 text-lg md:hidden flex items-center">
                 <i class="fas fa-hand-holding-heart mr-2"></i>SANKARA PM
@@ -158,17 +149,19 @@
                 if(onSubmitFn) document.querySelector('#modal-generic-content form').onsubmit = onSubmitFn;
                 Core.toggleModal('modal-generic');
             },
-            
+
             confirm: (msg) => {
                 return new Promise((resolve) => {
                     document.getElementById('modal-confirm-msg').textContent = msg;
                     document.getElementById('modal-confirm').classList.remove('hidden');
                     const yesBtn = document.getElementById('btn-confirm-yes');
                     const noBtn = document.getElementById('btn-confirm-cancel');
+                    // Clone to remove previous listeners
                     const newYes = yesBtn.cloneNode(true);
                     const newNo = noBtn.cloneNode(true);
                     yesBtn.parentNode.replaceChild(newYes, yesBtn);
                     noBtn.parentNode.replaceChild(newNo, noBtn);
+                    
                     newYes.onclick = () => { document.getElementById('modal-confirm').classList.add('hidden'); resolve(true); };
                     newNo.onclick = () => { document.getElementById('modal-confirm').classList.add('hidden'); resolve(false); };
                 });
@@ -185,6 +178,7 @@
         };
 
         // --- MODULE 2: USER VIEWS ---
+        // Defined as empty object then populated to ensure no syntax errors
         window.UserModule = {
             projects: [],
             activeProjectId: null,
@@ -194,7 +188,8 @@
             rabInputs: { delegates: 0, price: 0 }
         };
 
-        // --- USER MODULE FUNCTIONS ---
+        // --- ATTACH FUNCTIONS ---
+        
         UserModule.loadData = async () => {
             const { data } = await Core.supabase
                 .from('projects')
@@ -208,21 +203,23 @@
             UserModule.references = data || [];
         };
 
-        // --- HELPER: Calculate Logic ---
         UserModule.calculateEffectiveStep = (p) => {
             const approvals = p.project_approvals || [];
             const step2 = approvals.find(a => a.step_number === 2);
             const step6 = approvals.find(a => a.step_number === 6);
             
             let dbStep = parseInt(p.step) || 1;
-            let effectiveStep = 1;
-
+            
             if (step6 && step6.status === 'approved') return 6;
+            
+            // Logic: If step 2 (Finance) is NOT approved, cap at 2.
+            // Exception: If DB says step > 2 but finance is pending/rejected, force back to 2 visually.
             if (step2 && step2.status === 'approved') {
                 return Math.max(3, Math.min(5, dbStep));
             } else if (step2 && step2.status === 'submitted') {
                 return 2; 
             }
+            
             return Math.min(2, dbStep);
         };
 
@@ -281,37 +278,13 @@
                         <div class="bg-purple-50 p-4 rounded-xl border border-purple-100 shadow-sm"><div class="text-xs text-purple-600 uppercase font-bold mb-1">Berjalan (Thp 3-5)</div><div class="text-3xl font-bold text-purple-800">${active}</div></div>
                         <div class="bg-green-50 p-4 rounded-xl border border-green-100 shadow-sm"><div class="text-xs text-green-600 uppercase font-bold mb-1">Selesai (Thp 6)</div><div class="text-3xl font-bold text-green-800">${completed}</div></div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm"><h3 class="font-bold text-slate-700 mb-4 text-sm">Distribusi Status Proyek</h3><div class="h-64"><canvas id="statusChart"></canvas></div></div>
-                        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm"><h3 class="font-bold text-slate-700 mb-4 text-sm">Jumlah Proyek per Regional</h3><div class="h-64"><canvas id="regionChart"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                        <h3 class="font-bold text-slate-700 mb-4 text-sm">Timeline Proyek Aktif</h3>
+                        <div class="overflow-x-auto pb-2">${UserModule.renderGanttChart(filtered)}</div>
                     </div>
-                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm overflow-hidden"><h3 class="font-bold text-slate-700 mb-4 text-sm">Timeline Proyek Aktif</h3><div class="overflow-x-auto pb-2">${UserModule.renderGanttChart(filtered)}</div></div>
                 </div>`;
-            UserModule.initDashboardCharts(stage1, stage2, active, completed, filtered);
         };
-
-        UserModule.initDashboardCharts = (s1, s2, active, completed, data) => {
-            if(document.getElementById('statusChart')) {
-                new Chart(document.getElementById('statusChart'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Proposal', 'Finance', 'Berjalan', 'Selesai'],
-                        datasets: [{ data: [s1, s2, active, completed], backgroundColor: ['#60a5fa', '#facc15', '#a855f7', '#22c55e'], borderWidth: 0, hoverOffset: 4 }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: {size: 11} } } }, cutout: '70%' }
-                });
-            }
-            const regionCounts = {};
-            data.forEach(p => { if(p.regional) regionCounts[p.regional] = (regionCounts[p.regional] || 0) + 1; });
-            if(document.getElementById('regionChart')) {
-                new Chart(document.getElementById('regionChart'), {
-                    type: 'bar',
-                    data: { labels: Object.keys(regionCounts), datasets: [{ label: 'Proyek', data: Object.values(regionCounts), backgroundColor: '#0ea5e9', borderRadius: 4, barThickness: 20 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { borderDash: [2, 4] } }, x: { grid: { display: false } } } }
-                });
-            }
-        };
-
+        
         UserModule.renderProjectList = async (container) => {
             const regions = await Core.fetchRegions();
             const filtered = UserModule.filterRegion === 'all' ? UserModule.projects : UserModule.projects.filter(p => p.regional === UserModule.filterRegion);
@@ -408,9 +381,8 @@
             const status = getStatus(sid);
             const step = Core.SOP_STEPS.find(s => s.id === sid);
             
-            // Logic Locking Revised:
             const isFinanceApproved = getStatus(2) === 'approved';
-            const isLocked = isFinanceApproved; // Used for disable inputs in step 2
+            const isLocked = isFinanceApproved; // This controls the read-only state for Step 2
 
             let controls = '';
             if(step.requiresApproval) {
@@ -418,15 +390,15 @@
                 else if(status === 'submitted') controls = `<div class="bg-yellow-50 text-yellow-800 p-4 rounded text-center border border-yellow-200">Menunggu Verifikasi Finance<br><span class="text-xs">Hubungi Admin Finance</span></div>`;
                 else if(status === 'approved') controls = `<div class="bg-green-50 text-green-800 p-3 rounded text-center font-bold mb-2 border border-green-200">Disetujui oleh Finance</div>${sid<6 ? `<button onclick="UserModule.advanceStep('${p.id}',${sid+1})" class="bg-slate-100 w-full py-2 rounded hover:bg-slate-200 transition font-bold border border-slate-300">Lanjut Step ${sid+1}</button>`:''}`;
                 else {
-                    // Rejected State
+                     // REJECTION BOX LOGIC
                     const note = r.approvals.find(a=>a.step_number===sid)?.notes || '-';
                     controls = `
-                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r shadow-sm text-left">
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r shadow-sm text-left animate-pulse">
                         <div class="flex items-start">
-                            <i class="fas fa-exclamation-circle text-red-500 mt-0.5 mr-2"></i>
+                            <i class="fas fa-exclamation-circle text-red-500 mt-0.5 mr-3 text-lg"></i>
                             <div>
                                 <h4 class="text-red-800 font-bold text-sm">Pengajuan Ditolak</h4>
-                                <p class="text-red-700 text-sm mt-1">"${note}"</p>
+                                <p class="text-red-700 text-sm mt-1 font-medium">"${note}"</p>
                                 <p class="text-red-600 text-xs mt-2 italic">Silakan revisi data di atas sesuai catatan, lalu ajukan ulang.</p>
                             </div>
                         </div>
@@ -442,11 +414,9 @@
                 const st = getStatus(s.id);
                 const icon = st === 'approved' ? 'fa-check text-green-500' : 'fa-circle text-slate-300';
                 let locked = false;
-                
                 const dbStep = parseInt(p.step) || 1;
                 if (s.id > dbStep + 1) locked = true;
                 if (s.id > 2 && getStatus(2) !== 'approved') locked = true;
-
                 return `<button onclick="${locked?'':`UserModule.openProjectDetail('${p.id}',${s.id})`}" class="flex flex-col items-center min-w-[100px] p-2 rounded-xl mx-1 ${sid===s.id?'bg-green-600 text-white':'bg-white text-slate-600 border'} ${locked?'opacity-50 cursor-not-allowed': 'hover:shadow-md'}"><div class="text-xs font-bold">Tahap ${s.id}</div><div class="text-[10px]">${s.name}</div><i class="fas ${icon} text-xs absolute -top-1 -right-1 bg-white rounded-full p-1 border"></i></button>`;
             }).join('');
 
@@ -478,8 +448,9 @@
 
                 const getStatusColor = (act, lim) => act > lim ? 'text-red-600 font-bold' : 'text-green-600';
                 
-                const calcButton = isLocked ? '<div class="text-xs text-green-600 font-bold mb-4"><i class="fas fa-lock"></i> Anggaran Telah Disetujui (Terkunci)</div>' : '<button onclick="UserModule.updateCalculator()" class="w-full bg-blue-600 text-white py-2 rounded mb-4 font-bold hover:bg-blue-700 transition shadow-sm"><i class="fas fa-save mr-2"></i>Simpan & Hitung</button>';
-
+                // --- EXCEPTION: UPLOAD INVOICE IS ALLOWED, EDIT/DELETE/SAVE IS NOT ---
+                const calcButton = isLocked ? '<div class="text-xs text-green-600 font-bold mb-4 bg-green-50 p-2 rounded border border-green-200"><i class="fas fa-lock mr-1"></i> Anggaran Telah Disetujui (Mode Baca & Upload Bukti Saja)</div>' : '<button onclick="UserModule.updateCalculator()" class="w-full bg-blue-600 text-white py-2 rounded mb-4 font-bold hover:bg-blue-700 transition shadow-sm"><i class="fas fa-save mr-2"></i>Simpan & Hitung</button>';
+                
                 const calcHtml = `<div class="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6"><h4 class="font-bold text-gray-700 mb-4 border-b pb-2"><i class="fas fa-calculator mr-2"></i>Perencanaan Anggaran</h4><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="block text-xs font-bold text-gray-500 mb-1">Jumlah Delegasi</label><input id="calc-delegates" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defDelegates}" ${isLocked?'disabled':''}></div><div><label class="block text-xs font-bold text-slate-500 mb-1">Harga Volunteer (Rp)</label><input id="calc-price" type="number" class="w-full border p-2 rounded text-sm bg-white" value="${defPrice}" ${isLocked?'disabled':''}></div></div>${calcButton}<div class="flex justify-between items-center bg-blue-100 p-3 rounded mb-4"><span class="text-sm font-bold text-blue-800">Total Pemasukan (Estimasi):</span><span id="calc-income" class="text-lg font-bold text-blue-900">${Core.formatCurrency(totalIncome)}</span></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs"><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen A (Alat & Bahan) - 40%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-A">${Core.formatCurrency(limits['Komponen A'])}</span></span><span class="${getStatusColor(actuals['Komponen A'], limits['Komponen A'])}">Pakai: ${Core.formatCurrency(actuals['Komponen A'])}</span></div></div><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-gray-700 mb-1">Komponen B (Konsumsi) - 20%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-B">${Core.formatCurrency(limits['Komponen B'])}</span></span><span class="${getStatusColor(actuals['Komponen B'], limits['Komponen B'])}">Pakai: ${Core.formatCurrency(actuals['Komponen B'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen C (Fixed) - Auto</div><div class="flex justify-between items-center"><span class="text-gray-500">Tetap: 500rb</span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen C'])}</span></div></div><div class="bg-gray-100 p-3 rounded border shadow-sm opacity-80"><div class="font-bold text-gray-600 mb-1">Komponen D (Lain-lain) - Auto 10%</div><div class="flex justify-between items-center"><span class="text-gray-500">Limit: <span id="limit-val-D">${Core.formatCurrency(limits['Komponen D'])}</span></span><span class="font-bold text-blue-600">${Core.formatCurrency(actuals['Komponen D'])}</span></div></div></div></div>`;
 
                 const renderCategoryRows = (catName, title, isAuto = false) => {
@@ -489,8 +460,26 @@
                         const bJson = JSON.stringify(b).replace(/"/g, '&quot;');
                         const cleanName = b.item_name.replace(/^\[.*?\]\s/, '');
                         const hasInvoice = b.invoice_url ? true : false;
-                        const actionButtons = (isAuto || isLocked) ? (hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-green-600"><i class="fas fa-file-invoice"></i></a>` : '') : `<div class="flex items-center gap-1 justify-end">${hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-[10px] text-green-600 hover:text-green-800 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1" title="Lihat Invoice"><i class="fas fa-eye"></i></a>` : ''}<label class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1" title="${hasInvoice ? 'Ganti Invoice' : 'Upload Invoice'}"><i class="fas fa-upload"></i> ${hasInvoice ? 'Ganti' : 'Upload'}<input type="file" class="hidden" onchange="UserModule.uploadBudgetProof('${p.id}', '${b.id}', this.files[0])"></label><button onclick="UserModule.editBudget('${p.id}', ${bJson})" class="text-[10px] text-slate-500 hover:text-blue-500 p-1"><i class="fas fa-pen"></i></button><button onclick="UserModule.deleteItem('budgets', '${b.id}', '${p.id}')" class="text-[10px] text-slate-500 hover:text-red-500 p-1"><i class="fas fa-trash"></i></button></div>`;
-                        return `<div class="flex justify-between items-center border-b pb-2 pt-2 hover:bg-slate-50 text-xs pl-2 pr-2"><div class="flex-1"><div class="font-medium text-slate-800">${cleanName}</div><div class="text-[10px] text-slate-500 mt-1">${b.quantity} x ${Core.formatCurrency(b.unit_price)} ${hasInvoice ? '<span class="ml-1 text-green-600 flex items-center gap-1 inline-flex"><i class="fas fa-check-circle"></i> Ada Bukti</span>' : ''}</div></div><div class="text-right"><div class="font-bold text-slate-700 mb-1">${Core.formatCurrency(b.total_price)}</div><div class="flex justify-end">${actionButtons}</div></div></div>`;
+                        
+                        // LOGIC: If locked, ONLY show Upload/View. Hide Edit/Delete.
+                        const uploadSection = `
+                        <label class="cursor-pointer text-[9px] text-blue-500 hover:underline" title="Upload Invoice">
+                            <i class="fas fa-upload"></i> ${hasInvoice ? 'Ganti' : 'Inv'}
+                            <input type="file" class="hidden" onchange="UserModule.uploadBudgetProof('${p.id}', '${b.id}', this.files[0])">
+                        </label>`;
+                        const viewSection = hasInvoice ? `<a href="${b.invoice_url}" target="_blank" class="text-green-600 ml-1"><i class="fas fa-file-invoice"></i></a>` : '';
+
+                        let actionButtons = `<div class="flex items-center gap-1 justify-end">${viewSection} ${uploadSection}`;
+                        
+                        if (!isLocked && !isAuto) {
+                             actionButtons += `
+                            <button onclick="UserModule.editBudget('${p.id}', ${bJson})" class="text-[9px] text-slate-400 hover:text-blue-500 p-1"><i class="fas fa-pen"></i></button>
+                            <button onclick="UserModule.deleteItem('budgets', '${b.id}', '${p.id}')" class="text-[9px] text-slate-400 hover:text-red-500 p-1"><i class="fas fa-trash"></i></button>
+                             `;
+                        }
+                        actionButtons += `</div>`;
+
+                        return `<div class="flex justify-between items-center border-b pb-1 pt-1 hover:bg-slate-50 text-xs pl-2"><div class="flex-1"><div class="font-medium text-slate-800">${cleanName}</div><div class="text-[10px] text-slate-500">${b.quantity} x ${Core.formatCurrency(b.unit_price)} ${hasInvoice ? '<span class="ml-1 text-green-600"><i class="fas fa-check-circle"></i></span>' : ''}</div></div><div class="text-right"><div class="font-bold text-slate-700">${Core.formatCurrency(b.total_price)}</div>${actionButtons}</div></div>`;
                     }).join('');
                     const subtotal = items.reduce((sum, b) => sum + (b.total_price||0), 0);
                     return `<div class="mb-3 bg-white border rounded p-2 shadow-sm"><h5 class="text-xs font-bold text-gray-700 border-b pb-2 mb-2 flex justify-between bg-gray-50 p-2 rounded -mx-2 -mt-2"><span>${title}</span><span class="text-blue-600">${Core.formatCurrency(subtotal)}</span></h5>${rows}</div>`;
@@ -516,7 +505,7 @@
             } else if (sid === 3) {
                     const volRows = (r.volunteers||[]).map(v => { const vJson = JSON.stringify(v).replace(/"/g, '&quot;'); return `<div class="bg-slate-50 p-2 rounded border text-sm flex justify-between items-center"><span>${v.role_name}</span><div class="flex gap-2 font-bold items-center"><span>${v.count}</span><div class="flex gap-1 border-l pl-2 ml-2 border-slate-300"><button onclick="UserModule.editVolunteer('${p.id}', ${vJson})" class="text-blue-500 font-normal hover:text-blue-700"><i class="fas fa-edit"></i></button><button onclick="UserModule.deleteItem('volunteers', '${v.id}', '${p.id}')" class="text-red-400 font-normal hover:text-red-600"><i class="fas fa-trash"></i></button></div></div></div>`; }).join('');
                     const isFinanceApproved = getStatus(2) === 'approved';
-                    body += `<div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 transition">+ Divisi</button></div><div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div><label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>${isFinanceApproved ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Rundown & RAB)</button>` : '<div class="text-xs text-orange-500 italic mt-2 text-center bg-orange-50 p-2 rounded">Tombol download PDF akan muncul setelah Finance disetujui.</div>'}`;
+                    body += `<div class="flex justify-between mb-2"><h4 class="font-bold">Relawan</h4><button onclick="UserModule.addItemModal('volunteers','${p.id}')" class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 transition">+ Divisi</button></div><div class="grid grid-cols-2 gap-2 mb-4">${volRows}</div><label class="text-xs font-bold text-slate-500">STATUS LOGISTIK</label><select onchange="UserModule.updateField('${p.id}','purchase_status',this.value)" class="w-full border p-2 rounded"><option ${p.purchase_status==='Belum'?'selected':''}>Belum</option><option ${p.purchase_status==='Proses'?'selected':''}>Proses</option><option ${p.purchase_status==='Selesai'?'selected':''}>Selesai</option></select>${isFinanceApproved ? `<button onclick="PDFService.generate('${p.id}')" class="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow"><i class="fas fa-file-pdf mr-2"></i> Download PDF (Rundown & RAB)</button>` : ''}`;
             } else if (sid === 4) {
                 body += `<label class="text-xs font-bold text-slate-500">CATATAN FIRST MEET</label><textarea onchange="UserModule.updateField('${p.id}','firstmeet_notes',this.value)" class="w-full border p-2 rounded mb-4" rows="4">${p.firstmeet_notes||''}</textarea><div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300"><h4 class="font-bold text-slate-700 text-sm mb-2"><i class="fas fa-cloud-upload-alt mr-2"></i>Bukti First Meet (Foto/Absensi)</h4><div class="space-y-3"><input type="file" onchange="UserModule.uploadFile('${p.id}','proofs',this.files[0],'firstmeet_proof')" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /><input value="${p.firstmeet_proof||''}" onchange="UserModule.updateField('${p.id}','firstmeet_proof',this.value)" class="w-full border p-2 rounded text-sm bg-white" placeholder="Tempel Link Google Drive / Dropbox disini">${p.firstmeet_proof ? `<div class="mt-2"><img src="${p.firstmeet_proof}" class="h-32 rounded border shadow-sm object-cover hover:h-auto"><a href="${p.firstmeet_proof}" target="_blank" class="text-xs text-blue-500 underline block mt-1">Lihat Gambar Full</a></div>` : ''}</div></div>`;
             } else if (sid === 5) {
@@ -679,6 +668,7 @@
         UserModule.updateProjectDetails = async (form, pid) => { const d = Object.fromEntries(new FormData(form)); await Core.supabase.from('projects').update(d).eq('id', pid); Core.toggleModal('modal-generic'); UserModule.openProjectDetail(pid, 1); };
         UserModule.updateField = async (id, col, val) => { const { error } = await Core.supabase.from('projects').update({[col]: val}).eq('id', id); if(error) { Core.showToast('Gagal Simpan DB: ' + error.message); return false; } if (col === 'title' || col === 'regional') UserModule.syncBudgetToFinance(id); Core.showToast('Tersimpan'); return true; };
         UserModule.uploadFile = async (pid, bucket, file, dbCol) => { if(!file || file.size > 500 * 1024) return; const fileName = `${pid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`; const { error } = await Core.supabase.storage.from(bucket).upload(fileName, file); if(!error) { const { data } = Core.supabase.storage.from(bucket).getPublicUrl(fileName); const success = await UserModule.updateField(pid, dbCol, data.publicUrl); if(success) setTimeout(() => UserModule.openProjectDetail(pid, dbCol === 'firstmeet_proof' ? 4 : 6), 1000); } };
+        // submitApproval now calls the updated version with validation logic above
         UserModule.renderGanttChart = (list) => {
             if(!list.length) return '';
             const h = Array.from({length:20},(_,i)=>`<div class="w-8 shrink-0 text-center text-xs border-r">${i-10}</div>`).join('');
